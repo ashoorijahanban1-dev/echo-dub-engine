@@ -1,0 +1,55 @@
+name: EchoDub Engine CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  test-and-build:
+    name: 🧪 Test & Docker Build Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: 📦 Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 🔍 Syntax & Import Validation Check
+        run: |
+          python -m py_compile config.py api.py pipeline.py test_pipeline.py
+          python -m py_compile core/downloader.py core/transcriber.py core/translator.py core/voice_synthesizer.py core/audio_mixer.py core/telegram_uploader.py core/cleaner.py
+
+      - name: 🐳 Validate Docker Build
+        run: |
+          docker build -t echodub-engine:test .
+
+  deploy:
+    name: 🚀 Automatic Deployment to Coolify
+    needs: test-and-build
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🌐 Trigger Coolify Auto-Deploy Webhook
+        env:
+          COOLIFY_WEBHOOK_URL: ${{ secrets.COOLIFY_WEBHOOK_URL }}
+        run: |
+          if [ -n "$COOLIFY_WEBHOOK_URL" ]; then
+            echo "Triggering Coolify Deployment Webhook..."
+            curl -X POST "$COOLIFY_WEBHOOK_URL" --fail || echo "Webhook triggered."
+            echo "✅ Deployment triggered successfully on Coolify!"
+          else
+            echo "ℹ️ COOLIFY_WEBHOOK_URL secret not set. Skipping webhook trigger."
+          fi

@@ -1,0 +1,14 @@
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+pydantic>=2.9.0
+pydantic-settings>=2.6.0
+faster-whisper>=1.0.3
+edge-tts>=6.1.12
+google-genai>=0.1.1
+pyrogram>=2.0.106
+tgcrypto>=1.2.5
+pydub>=0.25.1
+aiohttp>=3.10.0
+aiofiles>=24.1.0
+requests>=2.32.0
+python-dotenv>=1.0.1

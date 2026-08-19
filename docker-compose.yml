@@ -1,0 +1,28 @@
+services:
+  echodub-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: echodub_engine
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - TELEGRAM_API_ID=${TELEGRAM_API_ID}
+      - TELEGRAM_API_HASH=${TELEGRAM_API_HASH}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHANNEL_ID=${TELEGRAM_CHANNEL_ID}
+      - WHISPER_MODEL_SIZE=${WHISPER_MODEL_SIZE:-large-v3}
+      - WHISPER_CPU_THREADS=8
+    volumes:
+      - echodub_storage:/app/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  echodub_storage:
+    driver: local

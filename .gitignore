@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# Environment Variables & Secrets
+.env
+*.session
+*.session-journal
+
+# Local Storage & Temporary Media Files
+storage/temp/
+storage/output/
+*.mp4
+*.mkv
+*.wav
+*.mp3
+*.jpg
+*.png
+*.srt
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
