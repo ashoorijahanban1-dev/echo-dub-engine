@@ -38,10 +38,49 @@ class DubbingJobPipeline:
         progress_callback: Optional[Callable[[int, str], Any]] = None
     ) -> Dict[str, Any]:
         """
-        Executes full end-to-end AI dubbing and Telegram CDN distribution pipeline.
+        Executes full pipeline by downloading video from URL.
         """
+        raw_video_path = await VideoDownloader.download_video(video_url, self.job_dir)
+        return await self._process_video_pipeline(
+            raw_video_path=raw_video_path,
+            video_url=video_url,
+            title=title,
+            voice_gender=voice_gender,
+            preserve_bgm=preserve_bgm,
+            progress_callback=progress_callback
+        )
+
+    async def run_from_local_file(
+        self,
+        local_video_path: Path,
+        title: Optional[str] = None,
+        voice_gender: str = "male",
+        preserve_bgm: bool = True,
+        progress_callback: Optional[Callable[[int, str], Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Executes pipeline on a video file directly uploaded from Iran Server (Geo-IP Bypass).
+        """
+        return await self._process_video_pipeline(
+            raw_video_path=local_video_path,
+            video_url=local_video_path.name,
+            title=title,
+            voice_gender=voice_gender,
+            preserve_bgm=preserve_bgm,
+            progress_callback=progress_callback
+        )
+
+    async def _process_video_pipeline(
+        self,
+        raw_video_path: Path,
+        video_url: str,
+        title: Optional[str],
+        voice_gender: str,
+        preserve_bgm: bool,
+        progress_callback: Optional[Callable[[int, str], Any]]
+    ) -> Dict[str, Any]:
         start_time = time.time()
-        logger.info(f"Starting Dubbing Job [{self.job_id}] for URL: {video_url}")
+        logger.info(f"Processing Dubbing Job [{self.job_id}] for file: {raw_video_path.name}")
 
         async def update_progress(percent: int, message: str):
             logger.info(f"[{self.job_id}] [{percent}%] {message}")
@@ -52,9 +91,6 @@ class DubbingJobPipeline:
                     progress_callback(percent, message)
 
         try:
-            # Stage 1: Download Video
-            await update_progress(10, "Downloading source video from downloadly...")
-            raw_video_path = await VideoDownloader.download_video(video_url, self.job_dir)
             video_title = title or raw_video_path.stem.replace("_", " ").replace("-", " ").title()
 
             # Stage 2: Audio Extraction
