@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     
     # Google Gemini AI Settings
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-1.5-flash"
+    GEMINI_MODEL: str = "gemini-3-flash-preview"
     
     # Faster-Whisper Settings (Optimized for 8-Core CPU)
     WHISPER_MODEL_SIZE: str = "large-v3"  # or 'medium', 'small'
