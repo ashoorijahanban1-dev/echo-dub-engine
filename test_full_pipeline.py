@@ -112,13 +112,13 @@ async def run_full_test():
     )
     print(f"✅ Persian Dubbed Audio: {DUBBED_AUDIO_FA.name} ({DUBBED_AUDIO_FA.stat().st_size / 1024:.1f} KB)")
 
-    # 5. Audio Ducking & Video Remuxing
-    print("\n[Stage 5/5] 🎛️ FFmpeg Audio Ducking Mastering & Video Remuxing...")
+    # 5. Pure Studio Remuxing (100% Original English Audio Muted/Removed)
+    print("\n[Stage 5/5] 🎛️ FFmpeg Audio Mastering & Video Remuxing (Original Voice Muted)...")
     await AudioVideoMixer.mix_and_render(
         original_video=SAMPLE_VIDEO_IN,
         dubbed_voiceover_wav=DUBBED_AUDIO_FA,
         output_video_path=FINAL_DUBBED_VIDEO,
-        preserve_bgm=True
+        preserve_bgm=False
     )
     await AudioVideoMixer.generate_thumbnail(FINAL_DUBBED_VIDEO, THUMBNAIL_IMG)
     print(f"✅ Final Dubbed 1080p Video Generated: {FINAL_DUBBED_VIDEO.name} ({FINAL_DUBBED_VIDEO.stat().st_size / 1024:.1f} KB)")

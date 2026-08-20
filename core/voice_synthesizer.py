@@ -51,18 +51,24 @@ class VoiceSynthesizer:
         # Create base silent audio track matching video total duration
         full_track = AudioSegment.silent(duration=int(total_duration * 1000) + 1000)
 
-        # Generate audio clips in parallel
+        # Generate audio clips in parallel with calm rate
         tasks = []
         for seg in segments:
             seg_file = temp_dir / f"seg_{seg['id']}.mp3"
             text_to_speak = seg.get("translated_text", seg.get("text", ""))
-            tasks.append(cls.synthesize_segment(text_to_speak, voice_name, seg_file))
+            tasks.append(cls.synthesize_segment(
+                text=text_to_speak,
+                voice=voice_name,
+                output_path=seg_file,
+                rate=settings.TTS_SPEECH_RATE,
+                pitch=settings.TTS_SPEECH_PITCH
+            ))
 
         logger.info("Executing async Edge-TTS audio synthesis batch...")
         await asyncio.gather(*tasks)
         logger.info("All segment audio files generated.")
 
-        # Overlay segments onto full timeline
+        # Overlay segments onto full timeline naturally without robotic pitch distortion
         for seg in segments:
             seg_file = temp_dir / f"seg_{seg['id']}.mp3"
             if not seg_file.exists():
@@ -70,12 +76,6 @@ class VoiceSynthesizer:
 
             seg_audio = AudioSegment.from_file(str(seg_file))
             start_ms = int(seg["start"] * 1000)
-            target_duration_ms = int((seg["end"] - seg["start"]) * 1000)
-
-            # If synthesized speech is slightly longer than original window, speed it up slightly (up to 1.25x)
-            if len(seg_audio) > target_duration_ms + 400 and target_duration_ms > 0:
-                speed_factor = min(1.25, len(seg_audio) / target_duration_ms)
-                seg_audio = seg_audio.speedup(playback_speed=speed_factor)
 
             full_track = full_track.overlay(seg_audio, position=start_ms)
 

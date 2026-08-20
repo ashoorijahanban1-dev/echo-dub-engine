@@ -42,8 +42,8 @@ class Settings(BaseSettings):
     # Edge-TTS Settings (Free High-Quality Persian Neural Voices)
     DEFAULT_PERSIAN_VOICE_MALE: str = "fa-IR-FaridNeural"
     DEFAULT_PERSIAN_VOICE_FEMALE: str = "fa-IR-DilaraNeural"
-    DEFAULT_VOICE_RATE: str = "+0%"
-    DEFAULT_VOICE_PITCH: str = "+0Hz"
+    TTS_SPEECH_RATE: str = "-8%"   # Calm, natural instructor pace (avoids rushed/robotic sound)
+    TTS_SPEECH_PITCH: str = "+0Hz"
     
     # Telegram CDN Settings
     TELEGRAM_API_ID: int = 0
@@ -59,8 +59,8 @@ class Settings(BaseSettings):
     # Audio Mastering Settings
     AUDIO_TARGET_LUFS: float = -14.0
     AUDIO_DUCKING_ATTENUATION_DB: float = -24.0
-    ORIGINAL_AUDIO_VOLUME: float = 0.04   # Subtle background whisper (0.0 = completely muted, 0.04 = soft whisper)
-    PRESERVE_ORIGINAL_AUDIO: bool = False # For educational courses, False = crystal-clear 100% Persian dubbing without English voice clash
+    ORIGINAL_AUDIO_VOLUME: float = 0.0    # 0.0 = completely remove original English instructor voice
+    PRESERVE_ORIGINAL_AUDIO: bool = False # Pure clean Persian dubbing without English interference
     
     # Cleanup Setting
     AUTO_DELETE_TEMP_FILES: bool = True
