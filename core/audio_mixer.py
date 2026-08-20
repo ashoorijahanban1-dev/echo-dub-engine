@@ -18,23 +18,25 @@ class AudioVideoMixer:
         original_video: Path,
         dubbed_voiceover_wav: Path,
         output_video_path: Path,
-        preserve_bgm: bool = True
+        preserve_bgm: bool = False
     ) -> Path:
         """
         Combines original video with dubbed voiceover using FFmpeg.
-        Applies sidechain ducking on original audio and normalizes volume to EBU R128 standard (-14 LUFS).
+        For educational tutorials:
+        - By default (preserve_bgm=False), mutes original English speech completely for 100% clean Persian dubbing.
+        - If preserve_bgm=True, reduces original background to a subtle 4% whisper so it never clashes with Persian dubbing.
         """
         os.makedirs(output_video_path.parent, exist_ok=True)
         
-        if preserve_bgm:
-            # Complex filter:
-            # [0:a] is original audio, [1:a] is new Persian voiceover
-            # Duck original audio by attenuating background when voice is present, then mix together with loudnorm.
+        bg_vol = settings.ORIGINAL_AUDIO_VOLUME
+        
+        if preserve_bgm and bg_vol > 0:
+            # Subtle background mix with sidechain ducking
             filter_complex = (
-                "[0:a]volume=0.2[bg];"
-                "[1:a]volume=1.2[vox];"
+                f"[0:a]volume={bg_vol}[bg];"
+                "[1:a]volume=1.3[vox];"
                 "[bg][vox]amix=inputs=2:duration=first:dropout_transition=2,"
-                f"loudnorm=I={settings.AUDIO_TARGET_LUFS}:LRA=11:TP=-1.5[aout]"
+                f"loudnorm=I={settings.AUDIO_TARGET_LUFS}:LRA=9:TP=-1.0[aout]"
             )
             
             cmd = [
@@ -52,7 +54,7 @@ class AudioVideoMixer:
                 str(output_video_path)
             ]
         else:
-            # Replace original audio completely with new dubbed track
+            # Pure clean Persian dubbing (standard for educational coding tutorials)
             cmd = [
                 "ffmpeg",
                 "-y",
@@ -60,7 +62,7 @@ class AudioVideoMixer:
                 "-i", str(dubbed_voiceover_wav),
                 "-map", "0:v:0",
                 "-map", "1:a:0",
-                "-af", f"loudnorm=I={settings.AUDIO_TARGET_LUFS}:LRA=11:TP=-1.5",
+                "-af", f"volume=1.25,loudnorm=I={settings.AUDIO_TARGET_LUFS}:LRA=9:TP=-1.0",
                 "-c:v", "copy",
                 "-c:a", "aac",
                 "-b:a", "192k",
