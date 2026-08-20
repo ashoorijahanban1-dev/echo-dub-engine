@@ -8,8 +8,15 @@ env/
 venv/
 .venv/
 
-# Environment Variables & Secrets
+# Environment & Local Storage
 .env
+.venv/
+__pycache__/
+*.pyc
+storage/
+models/
+cache/
+temp/
 *.session
 *.session-journal
 
