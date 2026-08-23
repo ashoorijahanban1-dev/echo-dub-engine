@@ -28,7 +28,8 @@ class AudioTranscriber:
                 model_size_or_path=settings.WHISPER_MODEL_SIZE,
                 device=settings.WHISPER_DEVICE,
                 compute_type=settings.WHISPER_COMPUTE_TYPE,
-                cpu_threads=settings.WHISPER_CPU_THREADS
+                cpu_threads=settings.WHISPER_CPU_THREADS,
+                download_root=str(settings.MODELS_DIR)
             )
             logger.info("Faster-Whisper model loaded successfully.")
         return cls._model_instance

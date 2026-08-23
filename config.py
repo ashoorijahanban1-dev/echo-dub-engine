@@ -12,10 +12,9 @@ ffmpeg_win_path = Path(os.environ.get("LOCALAPPDATA", "")) / "Microsoft" / "WinG
 if ffmpeg_win_path.exists() and str(ffmpeg_win_path) not in os.environ.get("PATH", ""):
     os.environ["PATH"] = f"{ffmpeg_win_path};" + os.environ.get("PATH", "")
 
-# HuggingFace Fast Mirror
-os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
-
-
+# HuggingFace official endpoint
+if "HF_ENDPOINT" in os.environ and "hf-mirror" in os.environ["HF_ENDPOINT"]:
+    del os.environ["HF_ENDPOINT"]
 
 class Settings(BaseSettings):
     # App Settings
@@ -28,6 +27,7 @@ class Settings(BaseSettings):
     STORAGE_DIR: Path = BASE_DIR / "storage"
     TEMP_DIR: Path = STORAGE_DIR / "temp"
     OUTPUT_DIR: Path = STORAGE_DIR / "output"
+    MODELS_DIR: Path = STORAGE_DIR / "models"
     
     # Google Gemini AI Settings
     GEMINI_API_KEY: str = ""
@@ -76,3 +76,4 @@ settings = Settings()
 os.makedirs(settings.STORAGE_DIR, exist_ok=True)
 os.makedirs(settings.TEMP_DIR, exist_ok=True)
 os.makedirs(settings.OUTPUT_DIR, exist_ok=True)
+os.makedirs(settings.MODELS_DIR, exist_ok=True)
