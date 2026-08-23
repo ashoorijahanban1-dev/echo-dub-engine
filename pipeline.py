@@ -6,6 +6,7 @@ Coordinates all 8 processing stages with progress tracking and error resilience.
 import os
 import time
 import uuid
+import asyncio
 import logging
 from pathlib import Path
 from typing import Dict, Any, Callable, Optional
