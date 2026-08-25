@@ -188,6 +188,27 @@ async def get_job_status(job_id: str):
 async def list_recent_jobs():
     return list(active_jobs.values())
 
+class TelegramProxyRequest(BaseModel):
+    method: str
+    payload: Dict[str, Any]
+
+@app.post("/api/v1/telegram/proxy", tags=["Telegram"])
+async def proxy_telegram_call(req: TelegramProxyRequest):
+    """
+    Proxies Telegram Bot API requests from Iran server through US datacenter with zero firewall blocks.
+    """
+    bot_token = settings.TELEGRAM_BOT_TOKEN or "8773331933:AAHOavxMB4jHC6CTojqBXjLM13NG6ERh2Ic"
+    url = f"https://api.telegram.org/bot{bot_token}/{req.method}"
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            res = await client.post(url, json=req.payload)
+            return res.json()
+    except Exception as e:
+        logger.error(f"Telegram proxy error: {e}")
+        return {"ok": False, "description": str(e)}
+
+
 @app.websocket("/api/v1/dub/ws/{job_id}")
 async def websocket_progress_endpoint(websocket: WebSocket, job_id: str):
     await websocket.accept()
