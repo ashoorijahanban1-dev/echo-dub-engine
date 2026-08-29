@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     GEMINI_MODEL: str = "gemini-3-flash-preview"
     
     # Faster-Whisper Settings (Optimized for CPU)
-    WHISPER_MODEL_SIZE: str = "tiny"  # or 'large-v3', 'base', 'small'
+    WHISPER_MODEL_SIZE: str = "small"  # or 'large-v3', 'base', 'tiny'
     WHISPER_DEVICE: str = "cpu"
     WHISPER_COMPUTE_TYPE: str = "int8"
     WHISPER_CPU_THREADS: int = 8
