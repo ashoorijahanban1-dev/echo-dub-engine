@@ -4,6 +4,7 @@ Uploads 1080p dubbed videos to personal Telegram Channel and generates streamabl
 """
 
 import os
+import asyncio
 import logging
 from pathlib import Path
 from typing import Dict, Any, Optional
