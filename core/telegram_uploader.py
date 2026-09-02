@@ -90,10 +90,10 @@ class TelegramCDNUploader:
         raw_channel_id = str(settings.TELEGRAM_CHANNEL_ID).strip()
         target_chat_id = int(raw_channel_id) if (raw_channel_id.startswith("-") and raw_channel_id[1:].isdigit()) or raw_channel_id.isdigit() else raw_channel_id
 
-        max_attempts = 3
-        
-        for attempt in range(1, max_attempts + 1):
-            try:
+        # 1. Try Pyrogram MTProto first
+        try:
+            client = await cls.get_client()
+            if client:
                 msg = await client.send_video(
                     chat_id=target_chat_id,
                     video=str(video_path),
@@ -118,16 +118,50 @@ class TelegramCDNUploader:
                     "channel_id": str(target_chat_id),
                     "file_id": msg.video.file_id if msg.video else None
                 }
-            except Exception as e:
-                error_type = type(e).__name__
-                logger.error(f"Upload attempt {attempt}/{max_attempts} failed: {error_type} - {e}")
-                
-                if attempt == max_attempts:
-                    logger.error("All upload attempts failed.")
-                    return {"uploaded": False, "error": f"{error_type}: {str(e)}", "telegram_link": None}
-                
-                sleep_time = 2 ** attempt
-                logger.info(f"Retrying in {sleep_time} seconds...")
-                await asyncio.sleep(sleep_time)
+        except Exception as pyrogram_err:
+            logger.warning(f"Pyrogram MTProto upload notice ({pyrogram_err}). Falling back to Telegram Bot API...")
 
-        return {"uploaded": False, "error": "Unknown error", "telegram_link": None}
+        # 2. Resilient Fallback to Telegram Bot HTTP API
+        try:
+            async with httpx.AsyncClient(timeout=300.0) as http_client:
+                with open(video_path, "rb") as vf:
+                    files = {"video": (video_path.name, vf, "video/mp4")}
+                    data = {
+                        "chat_id": str(target_chat_id),
+                        "caption": caption,
+                        "parse_mode": "HTML",
+                        "supports_streaming": "true"
+                    }
+                    if thumbnail_path and thumbnail_path.exists():
+                        with open(thumbnail_path, "rb") as tf:
+                            files["thumbnail"] = (thumbnail_path.name, tf, "image/jpeg")
+                    res = await http_client.post(
+                        f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendVideo",
+                        data=data,
+                        files=files
+                    )
+                    res_json = res.json()
+                    if res_json.get("ok"):
+                        msg_data = res_json["result"]
+                        msg_id = msg_data["message_id"]
+                        channel_username = str(raw_channel_id).replace("@", "")
+                        if channel_username.startswith("-100"):
+                            clean_id = channel_username.replace("-100", "")
+                            post_link = f"https://t.me/c/{clean_id}/{msg_id}"
+                        else:
+                            post_link = f"https://t.me/{channel_username}/{msg_id}"
+
+                        logger.info(f"Video uploaded successfully via Bot API! Link: {post_link}")
+                        return {
+                            "uploaded": True,
+                            "telegram_link": post_link,
+                            "message_id": msg_id,
+                            "channel_id": str(target_chat_id),
+                            "file_id": msg_data.get("video", {}).get("file_id")
+                        }
+                    else:
+                        logger.error(f"Bot API upload error: {res_json}")
+                        return {"uploaded": False, "error": str(res_json), "telegram_link": None}
+        except Exception as http_err:
+            logger.error(f"Error during Telegram Bot API fallback upload: {http_err}")
+            return {"uploaded": False, "error": str(http_err), "telegram_link": None}
