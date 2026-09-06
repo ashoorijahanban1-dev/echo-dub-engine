@@ -124,22 +124,22 @@ class TelegramCDNUploader:
         # 2. Resilient Fallback to Telegram Bot HTTP API
         try:
             async with httpx.AsyncClient(timeout=300.0) as http_client:
-                with open(video_path, "rb") as vf:
-                    files = {"video": (video_path.name, vf, "video/mp4")}
-                    data = {
-                        "chat_id": str(target_chat_id),
-                        "caption": caption,
-                        "parse_mode": "HTML",
-                        "supports_streaming": "true"
-                    }
-                    if thumbnail_path and thumbnail_path.exists():
-                        with open(thumbnail_path, "rb") as tf:
-                            files["thumbnail"] = (thumbnail_path.name, tf, "image/jpeg")
-                    res = await http_client.post(
-                        f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendVideo",
-                        data=data,
-                        files=files
-                    )
+                video_bytes = video_path.read_bytes()
+                files = {"video": (video_path.name, video_bytes, "video/mp4")}
+                if thumbnail_path and thumbnail_path.exists():
+                    thumb_bytes = thumbnail_path.read_bytes()
+                    files["thumbnail"] = (thumbnail_path.name, thumb_bytes, "image/jpeg")
+                data = {
+                    "chat_id": str(target_chat_id),
+                    "caption": caption,
+                    "parse_mode": "HTML",
+                    "supports_streaming": "true"
+                }
+                res = await http_client.post(
+                    f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendVideo",
+                    data=data,
+                    files=files
+                )
                     res_json = res.json()
                     if res_json.get("ok"):
                         msg_data = res_json["result"]

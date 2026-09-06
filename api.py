@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel
 from fastapi import FastAPI, BackgroundTasks, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File, Form, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import aiofiles
 import httpx
@@ -266,6 +266,25 @@ async def stream_telegram_video(file_id: str, request: Request):
         logger.error(f"Error streaming telegram file {file_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/v1/stream/output/{filename:path}", tags=["Streaming"])
+async def stream_output_video(filename: str):
+    """
+    Directly streams rendered dubbed MP4 videos from storage/output with HTTP 206 Range support.
+    """
+    file_path = settings.OUTPUT_DIR / filename
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail=f"Dubbed video file not found: {filename}")
+    return FileResponse(path=str(file_path), media_type="video/mp4", filename=file_path.name)
+
+@app.get("/api/v1/download/output/{filename:path}", tags=["Download"])
+async def download_output_video(filename: str):
+    """
+    Allows Iran Server to download rendered dubbed MP4 directly for local caching and zero-latency Iranian CDN.
+    """
+    file_path = settings.OUTPUT_DIR / filename
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail=f"Dubbed video file not found: {filename}")
+    return FileResponse(path=str(file_path), media_type="video/mp4", filename=file_path.name)
 
 @app.websocket("/api/v1/dub/ws/{job_id}")
 async def websocket_progress_endpoint(websocket: WebSocket, job_id: str):
