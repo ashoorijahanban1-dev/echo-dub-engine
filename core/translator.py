@@ -72,8 +72,8 @@ class TechTranslator:
                     "id": seg["id"],
                     "start": seg["start"],
                     "end": seg["end"],
-                    "duration": seg["duration"],
-                    "original_text": seg["text"]
+                    "duration": seg.get("duration", round(seg.get("end", 0) - seg.get("start", 0), 2)),
+                    "original_text": seg.get("text", seg.get("original_text", ""))
                 }
                 for seg in batch
             ]
@@ -102,12 +102,13 @@ class TechTranslator:
                 
                 # Merge translated text back with original timing data
                 for orig, trans in zip(batch, translated_batch):
-                    orig["translated_text"] = trans.get("translated_text", orig["text"])
+                    fallback_text = orig.get("text", orig.get("original_text", ""))
+                    orig["translated_text"] = trans.get("translated_text", fallback_text)
                     all_translated_segments.append(orig)
             except Exception as e:
                 logger.error(f"Error in Gemini translation batch: {e}. Fallback to direct text.")
                 for orig in batch:
-                    orig["translated_text"] = orig["text"]
+                    orig["translated_text"] = orig.get("text", orig.get("original_text", ""))
                     all_translated_segments.append(orig)
 
         logger.info(f"All {len(all_translated_segments)} segments successfully translated into natural Persian.")
