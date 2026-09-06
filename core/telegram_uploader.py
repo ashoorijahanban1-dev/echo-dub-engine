@@ -140,28 +140,28 @@ class TelegramCDNUploader:
                     data=data,
                     files=files
                 )
-                    res_json = res.json()
-                    if res_json.get("ok"):
-                        msg_data = res_json["result"]
-                        msg_id = msg_data["message_id"]
-                        channel_username = str(raw_channel_id).replace("@", "")
-                        if channel_username.startswith("-100"):
-                            clean_id = channel_username.replace("-100", "")
-                            post_link = f"https://t.me/c/{clean_id}/{msg_id}"
-                        else:
-                            post_link = f"https://t.me/{channel_username}/{msg_id}"
-
-                        logger.info(f"Video uploaded successfully via Bot API! Link: {post_link}")
-                        return {
-                            "uploaded": True,
-                            "telegram_link": post_link,
-                            "message_id": msg_id,
-                            "channel_id": str(target_chat_id),
-                            "file_id": msg_data.get("video", {}).get("file_id")
-                        }
+                res_json = res.json()
+                if res_json.get("ok"):
+                    msg_data = res_json["result"]
+                    msg_id = msg_data["message_id"]
+                    channel_username = str(raw_channel_id).replace("@", "")
+                    if channel_username.startswith("-100"):
+                        clean_id = channel_username.replace("-100", "")
+                        post_link = f"https://t.me/c/{clean_id}/{msg_id}"
                     else:
-                        logger.error(f"Bot API upload error: {res_json}")
-                        return {"uploaded": False, "error": str(res_json), "telegram_link": None}
+                        post_link = f"https://t.me/{channel_username}/{msg_id}"
+
+                    logger.info(f"Video uploaded successfully via Bot API! Link: {post_link}")
+                    return {
+                        "uploaded": True,
+                        "telegram_link": post_link,
+                        "message_id": msg_id,
+                        "channel_id": str(target_chat_id),
+                        "file_id": msg_data.get("video", {}).get("file_id")
+                    }
+                else:
+                    logger.error(f"Bot API upload error: {res_json}")
+                    return {"uploaded": False, "error": str(res_json), "telegram_link": None}
         except Exception as http_err:
             logger.error(f"Error during Telegram Bot API fallback upload: {http_err}")
             return {"uploaded": False, "error": str(http_err), "telegram_link": None}
