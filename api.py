@@ -9,9 +9,11 @@ import logging
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel
-from fastapi import FastAPI, BackgroundTasks, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, BackgroundTasks, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File, Form, Request
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 import aiofiles
+import httpx
 
 from config import settings
 from pipeline import DubbingJobPipeline
@@ -207,6 +209,62 @@ async def proxy_telegram_call(req: TelegramProxyRequest):
     except Exception as e:
         logger.error(f"Telegram proxy error: {e}")
         return {"ok": False, "description": str(e)}
+ 
+@app.get("/api/v1/stream/{file_id}", tags=["Streaming"])
+async def stream_telegram_video(file_id: str, request: Request):
+    """
+    Streams Telegram CDN video directly to clients (bypassing Iran filtering) with full HTTP Range Request support.
+    """
+    bot_token = settings.TELEGRAM_BOT_TOKEN or "8773331933:AAHOavxMB4jHC6CTojqBXjLM13NG6ERh2Ic"
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            r = await client.get(f"https://api.telegram.org/bot{bot_token}/getFile?file_id={file_id}")
+            data = r.json()
+            if not data.get("ok") or not data.get("result", {}).get("file_path"):
+                raise HTTPException(status_code=404, detail="Telegram file not found")
+
+            file_path = data["result"]["file_path"]
+            download_url = f"https://api.telegram.org/file/bot{bot_token}/{file_path}"
+
+        range_header = request.headers.get("range")
+        req_headers = {}
+        if range_header:
+            req_headers["Range"] = range_header
+
+        stream_client = httpx.AsyncClient(timeout=120.0)
+        tg_req = stream_client.build_request("GET", download_url, headers=req_headers)
+        tg_res = await stream_client.send(tg_req, stream=True)
+
+        headers = {
+            "Accept-Ranges": "bytes",
+            "Content-Type": "video/mp4",
+            "Access-Control-Allow-Origin": "*",
+            "Cache-Control": "public, max-age=86400",
+        }
+        for k in ["Content-Range", "Content-Length"]:
+            if k in tg_res.headers:
+                headers[k] = tg_res.headers[k]
+
+        async def stream_generator():
+            try:
+                async for chunk in tg_res.aiter_bytes(chunk_size=128 * 1024):
+                    yield chunk
+            finally:
+                await tg_res.aclose()
+                await stream_client.aclose()
+
+        return StreamingResponse(
+            stream_generator(),
+            status_code=tg_res.status_code,
+            headers=headers,
+            media_type="video/mp4"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error streaming telegram file {file_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.websocket("/api/v1/dub/ws/{job_id}")
