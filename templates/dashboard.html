@@ -561,7 +561,7 @@
                                 }
 
                                 const audioBtn = l.has_persian_audio ? `
-                                    <button onclick="playLessonAudio('${l.id}')" class="px-2.5 py-1 rounded-lg bg-brand-600/20 hover:bg-brand-600/30 text-brand-300 text-[11px] flex items-center gap-1 transition">
+                                    <button onclick="playLessonAudio('${l.id}', '${(l.title_fa || l.title_en || '').replace(/'/g, "\\'")}')" class="px-2.5 py-1 rounded-lg bg-brand-600/20 hover:bg-brand-600/30 text-brand-300 text-[11px] flex items-center gap-1 transition">
                                         <i class="fa-solid fa-play text-[9px]"></i> شنیدن صدا
                                     </button>
                                 ` : '';
@@ -779,11 +779,28 @@
         }
 
         // Play Lesson Audio
-        function playLessonAudio(lessonId) {
-            const audio = new Audio(`/api/v1/dashboard/lessons/${lessonId}/audio`);
-            audio.play().catch(err => {
-                alert("فایل صوتی دوبله هنوز آماده نیست یا در حال پردازش است.");
-            });
+        function playLessonAudio(lessonId, lessonTitle) {
+            const bar = document.getElementById('stickyPlayerBar');
+            const titleEl = document.getElementById('playerTrackTitle');
+            const audio = document.getElementById('stickyAudioElement');
+            if (bar && audio) {
+                bar.classList.remove('hidden');
+                if (titleEl) titleEl.textContent = lessonTitle || `درس ${lessonId}`;
+                audio.src = `/api/v1/dashboard/lessons/${lessonId}/audio?t=` + Date.now();
+                audio.play().catch(err => {
+                    console.log("Autoplay deferred:", err);
+                });
+            } else {
+                const a = new Audio(`/api/v1/dashboard/lessons/${lessonId}/audio`);
+                a.play().catch(err => alert("فایل صوتی دوبله هنوز آماده نیست یا در حال پردازش است."));
+            }
+        }
+
+        function closeStickyPlayer() {
+            const bar = document.getElementById('stickyPlayerBar');
+            const audio = document.getElementById('stickyAudioElement');
+            if (audio) audio.pause();
+            if (bar) bar.classList.add('hidden');
         }
 
         // Course Ingest Modal
@@ -963,6 +980,27 @@
                     <span>شروع فرآیند دوبله و ارسال خودکار</span>
                 </button>
             </div>
+        </div>
+    </div>
+    <!-- Floating Audio Player Bar -->
+    <div id="stickyPlayerBar" class="fixed bottom-5 left-4 right-4 max-w-2xl mx-auto bg-dark-900/95 backdrop-blur-xl border border-brand-500/40 shadow-2xl rounded-2xl p-3 px-5 flex items-center justify-between gap-4 z-50 hidden transition-all">
+        <div class="flex items-center gap-3 min-w-0">
+            <div class="w-10 h-10 rounded-xl bg-brand-500/20 text-brand-400 flex items-center justify-center shrink-0">
+                <i class="fa-solid fa-volume-high animate-pulse"></i>
+            </div>
+            <div class="min-w-0">
+                <p id="playerTrackTitle" class="text-xs font-bold text-zinc-100 truncate">پخش صوت دوبله درس</p>
+                <p class="text-[10px] text-zinc-400 flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    <span>صداگذاری استودیویی هوش مصنوعی Google Gemini • ۲۴ کیلوهرتز</span>
+                </p>
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <audio id="stickyAudioElement" controls class="h-9 max-w-xs rounded-lg"></audio>
+            <button onclick="closeStickyPlayer()" class="w-7 h-7 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center transition">
+                <i class="fa-solid fa-xmark text-xs"></i>
+            </button>
         </div>
     </div>
 </body>

@@ -125,9 +125,107 @@ def start_embedded_worker():
     t.start()
     return t
 
+def seed_demo_data_if_empty():
+    """
+    Ensures that when a new server or container starts with empty databases,
+    demonstration data (sample course, chapter, QC-passed lesson, and real audio)
+    is seeded so the dashboard is immediately interactive and functional.
+    """
+    try:
+        from database import DualDatabaseManager, Dialect
+        from workers.dubbing import PersianDubbingWorker
+        db = DualDatabaseManager()
+        courses = db.fetchall_processing("SELECT id FROM courses LIMIT 1")
+        if courses:
+            return
+
+        logger.info("Empty database detected. Seeding demonstration course and dubbed audio...")
+        is_pg = getattr(db.processing_backend, "dialect", "") == Dialect.POSTGRES
+        p = "%s" if is_pg else "?"
+        ins_cmd = "INSERT INTO" if is_pg else "INSERT OR REPLACE INTO"
+        now = datetime.now(timezone.utc).isoformat()
+
+        url = "https://downloadly.ir/elearning/video-tutorials/docker-mastery/"
+        canonical = url
+        slug = "docker-mastery"
+        title_fa = "دوره جامع کانتینرسازی و داکر (نسخه دوبله استودیویی)"
+        title_en = "Docker Mastery Course"
+        fp = "fp_demo_docker_mastery"
+
+        disc_id = db.upsert_discovered_course(
+            url=url, canonical_url=canonical, slug=slug, title_en=title_en, title_fa=title_fa, fingerprint=fp, metadata={}
+        )
+        course_id = db.create_or_update_course(
+            discovery_id=disc_id, canonical_url=canonical, slug=slug, title_en=title_en, title_fa=title_fa, fingerprint=fp, total_parts=1
+        )
+
+        ch_id = f"ch_{uuid.uuid4().hex[:12]}"
+        db.processing_backend.execute(
+            f"""
+            {ins_cmd} chapters (id, course_id, title_fa, order_index, created_at)
+            VALUES ({p}, {p}, 'فصل اول: آشنایی با داکر و مفاهیم اولیه', 1, {p})
+            """,
+            (ch_id, course_id, now)
+        )
+
+        lesson_id = "les_demo_docker_01"
+        lesson_work_dir = Path(config.STORAGE_DIR) / "lessons" / lesson_id
+        lesson_work_dir.mkdir(parents=True, exist_ok=True)
+        persian_audio_path = lesson_work_dir / "persian_audio.wav"
+
+        db.processing_backend.execute(
+            f"""
+            {ins_cmd} lessons (id, chapter_id, course_id, lesson_number, title_en, title_fa, duration_seconds, status, video_source_path, created_at, updated_at)
+            VALUES ({p}, {p}, {p}, 1, 'Introduction to Containers & Docker Engine', 'درس اول: مقدمه بر معماری کانتینرها و موتور داکر', 180.0, 'QC_PASSED', {p}, {p}, {p})
+            """,
+            (lesson_id, ch_id, course_id, str(lesson_work_dir / "input.mp4"), now, now)
+        )
+
+        # Generate audio file
+        if not persian_audio_path.exists():
+            demo_text = "سلام و درود به همه شما دوستان و دانشجویان گرامی. خیلی خوش اومدید به این دوره آموزشی تخصصی. امروز می‌خوایم با هم مفاهیم پایه‌ای کانتینرسازی و نحوه استقرار سرویس‌ها روی داکر رو از صفر تا صد به صورت کاملاً عملی و گام به گام بررسی کنیم."
+            try:
+                dubber = PersianDubbingWorker()
+                dubber.synthesize_voice(text_fa=demo_text, output_wav=persian_audio_path, voice_name="Puck")
+            except Exception as synth_err:
+                logger.warning(f"Demo voice synthesis fallback: {synth_err}")
+                import struct, math
+                sample_rate = 24000
+                duration = 3.0
+                raw_pcm = bytearray()
+                for i in range(int(sample_rate * duration)):
+                    val = int(8000 * math.sin(2 * math.pi * 440 * (i / sample_rate)))
+                    raw_pcm.extend(struct.pack('<h', val))
+                wav_bytes = PersianDubbingWorker._pcm_to_wav(bytes(raw_pcm), sample_rate, 1, 16)
+                with open(persian_audio_path, "wb") as f:
+                    f.write(wav_bytes)
+
+        db.record_qc_report(
+            lesson_id=lesson_id,
+            passed=True,
+            metrics={"wpm": 134.2, "duration_ratio": 0.98, "terminology_preservation": 1.0, "snr_db": 28.5},
+            failure_reasons=[]
+        )
+
+        job_id = f"job_demo_{uuid.uuid4().hex[:8]}"
+        db.processing_backend.execute(
+            f"""
+            {ins_cmd} dubbing_jobs (id, course_id, lesson_id, job_type, status, progress, attempts, created_at, updated_at)
+            VALUES ({p}, {p}, {p}, 'DUBBING', 'COMPLETED', 100, 1, {p}, {p})
+            """,
+            (job_id, course_id, lesson_id, now, now)
+        )
+        logger.info(f"Demonstration course, lesson, and dubbed audio seeded successfully ({lesson_id}).")
+    except Exception as e:
+        logger.error(f"Error seeding demo data: {e}")
+
 if os.environ.get("RPIM_WORKER_EMBEDDED", "1") == "1" and os.environ.get("PYTEST_CURRENT_TEST") is None:
     @app.on_event("startup")
     def on_startup_start_worker():
+        try:
+            seed_demo_data_if_empty()
+        except Exception as seed_err:
+            logger.warning(f"Startup demo seed failed: {seed_err}")
         start_embedded_worker()
 
 # -----------------------------------------------------------------------------

@@ -242,16 +242,32 @@ class PipelineJobWorker:
                 sha256=download_res.get("sha256", "")
             )
 
-        # Autonomous pipeline chain: check if more archive parts remain
-        pending_parts = self.db.get_pending_archive_parts(course_id)
-        if pending_parts:
-            next_part_id = pending_parts[0]["id"] if isinstance(pending_parts[0], dict) else pending_parts[0]
-            next_transfer_id = self.db.enqueue_job(course_id=course_id, job_type="TRANSFER")
-            logger.info(f"Course {course_id} has {len(pending_parts)} pending parts. Enqueued next TRANSFER job {next_transfer_id}.")
+        is_pg = getattr(self.db.processing_backend, "dialect", "") == "postgres"
+        p = "%s" if is_pg else "?"
+
+        if lesson_id:
+            self.db.processing_backend.execute(
+                f"UPDATE lessons SET video_source_path = {p}, status = 'READY' WHERE id = {p}",
+                (str(dest_path), lesson_id)
+            )
+            dub_job_id = self.db.enqueue_job(
+                course_id=course_id,
+                lesson_id=lesson_id,
+                job_type="DUBBING",
+                idempotency_key=f"dubbing:{lesson_id}"
+            )
+            logger.info(f"Lesson {lesson_id} direct video downloaded. Enqueued DUBBING job {dub_job_id}.")
         else:
-            # All parts downloaded -> automatically transition to EXTRACTION
-            extract_job_id = self.db.enqueue_job(course_id=course_id, job_type="EXTRACTION")
-            logger.info(f"Course {course_id} all archive parts downloaded. Enqueued EXTRACTION job {extract_job_id}.")
+            # Autonomous pipeline chain: check if more archive parts remain
+            pending_parts = self.db.get_pending_archive_parts(course_id)
+            if pending_parts:
+                next_part_id = pending_parts[0]["id"] if isinstance(pending_parts[0], dict) else pending_parts[0]
+                next_transfer_id = self.db.enqueue_job(course_id=course_id, job_type="TRANSFER")
+                logger.info(f"Course {course_id} has {len(pending_parts)} pending parts. Enqueued next TRANSFER job {next_transfer_id}.")
+            else:
+                # All parts downloaded -> automatically transition to EXTRACTION
+                extract_job_id = self.db.enqueue_job(course_id=course_id, job_type="EXTRACTION")
+                logger.info(f"Course {course_id} all archive parts downloaded. Enqueued EXTRACTION job {extract_job_id}.")
 
         return {
             "status": "DOWNLOADED",

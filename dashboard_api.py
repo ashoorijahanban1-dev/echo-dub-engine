@@ -21,7 +21,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 import config
-from database import DualDatabaseManager
+from database import DualDatabaseManager, Dialect
 from workers.dubbing import PersianDubbingWorker, SynthesisException
 from workers.job_runner import PipelineJobWorker, check_free_disk_space
 
@@ -434,17 +434,29 @@ def ingest_course_dashboard(req: IngestCourseRequest):
     )
 
     lower_url = url.lower()
-    is_direct_video = any(lower_url.endswith(ext) for ext in [".mp4", ".mkv", ".webm", ".avi", ".mov"])
+    is_direct_video = any(lower_url.endswith(ext) or ext in lower_url for ext in [".mp4", ".mkv", ".webm", ".avi", ".mov"])
 
     if is_direct_video:
-        lesson_id = f"les_{uuid.uuid4().hex[:12]}"
+        is_pg = getattr(db.processing_backend, "dialect", "") == Dialect.POSTGRES
+        p = "%s" if is_pg else "?"
+        ins_cmd = "INSERT INTO" if is_pg else "INSERT OR REPLACE INTO"
+
+        ch_id = f"ch_{uuid.uuid4().hex[:12]}"
         now = datetime.now(timezone.utc).isoformat()
         db.processing_backend.execute(
-            """
-            INSERT INTO lessons (id, course_id, lesson_number, title_fa, title_en, status, video_source_path, created_at, updated_at)
-            VALUES (?, ?, 1, ?, ?, 'PENDING', ?, ?, ?)
+            f"""
+            {ins_cmd} chapters (id, course_id, title_fa, order_index, created_at)
+            VALUES ({p}, {p}, 'فصل اول', 1, {p})
             """,
-            (lesson_id, course_id, title_fa, title_en, url, now, now)
+            (ch_id, course_id, now)
+        )
+        lesson_id = f"les_{uuid.uuid4().hex[:12]}"
+        db.processing_backend.execute(
+            f"""
+            {ins_cmd} lessons (id, chapter_id, course_id, lesson_number, title_fa, title_en, status, video_source_path, created_at, updated_at)
+            VALUES ({p}, {p}, {p}, 1, {p}, {p}, 'PENDING', {p}, {p}, {p})
+            """,
+            (lesson_id, ch_id, course_id, title_fa, title_en, url, now, now)
         )
         job_id = db.enqueue_job(
             course_id=course_id,

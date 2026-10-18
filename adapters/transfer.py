@@ -54,7 +54,15 @@ class TransferAdapter:
         "dl3.downloadlynet.ir",
         "dl4.downloadlynet.ir",
         "dl5.downloadlynet.ir",
-        "dl6.downloadlynet.ir"
+        "dl6.downloadlynet.ir",
+        "googleapis.com",
+        "commondatastorage.googleapis.com",
+        "storage.googleapis.com",
+        "github.com",
+        "githubusercontent.com",
+        "raw.githubusercontent.com",
+        "archive.org",
+        "w3schools.com"
     }
     ALLOWED_SCHEMES = {"http", "https"}
     ALLOWED_PORTS = {80, 443, 8080, 8443}
@@ -153,8 +161,13 @@ class TransferAdapter:
         part_path = dest.with_suffix(dest.suffix + ".part")
         meta_path = dest.with_suffix(dest.suffix + ".meta")
 
+        # Determine if source URL belongs to Iran-restricted Downloadly origins
+        parsed_src = urlparse(source_url)
+        src_host = (parsed_src.hostname or "").lower()
+        is_downloadly = any(src_host == d or src_host.endswith("." + d) for d in ["downloadly.ir", "downloadlynet.ir"])
+
         # Determine download URL and authorization headers
-        if use_relay and self.relay_base:
+        if use_relay and self.relay_base and is_downloadly:
             request_url = self.build_relay_stream_url(source_url)
             # Token goes ONLY to the relay
             headers = {
