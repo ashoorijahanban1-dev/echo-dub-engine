@@ -179,8 +179,9 @@ class TransferAdapter:
             # Direct source access: NO relay token sent!
             headers = {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                "Referer": "https://downloadly.ir/"
             }
+            if is_downloadly:
+                headers["Referer"] = "https://downloadly.ir/"
 
         existing_size = part_path.stat().st_size if part_path.exists() else 0
         cached_meta = {}

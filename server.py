@@ -207,13 +207,15 @@ def seed_demo_data_if_empty():
             failure_reasons=[]
         )
 
-        job_id = f"job_demo_{uuid.uuid4().hex[:8]}"
+        job_id = db.enqueue_job(
+            course_id=course_id,
+            lesson_id=lesson_id,
+            job_type="DUBBING",
+            idempotency_key=f"dubbing_demo:{lesson_id}"
+        )
         db.processing_backend.execute(
-            f"""
-            {ins_cmd} dubbing_jobs (id, course_id, lesson_id, job_type, status, progress, attempts, created_at, updated_at)
-            VALUES ({p}, {p}, {p}, 'DUBBING', 'COMPLETED', 100, 1, {p}, {p})
-            """,
-            (job_id, course_id, lesson_id, now, now)
+            f"UPDATE dubbing_jobs SET status = 'COMPLETED', progress = 100 WHERE id = {p}",
+            (job_id,)
         )
         logger.info(f"Demonstration course, lesson, and dubbed audio seeded successfully ({lesson_id}).")
     except Exception as e:
