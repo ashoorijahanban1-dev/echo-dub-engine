@@ -192,6 +192,13 @@ class CommitVisibilityRequest(BaseModel):
 # API Endpoints
 # -----------------------------------------------------------------------------
 
+from fastapi.responses import RedirectResponse
+
+@app.get("/", include_in_schema=False)
+def root_index():
+    return RedirectResponse(url="/dashboard", status_code=302)
+
+@app.get("/health")
 @app.get("/api/v1/health")
 def health_check():
     return {

@@ -24,6 +24,10 @@ COPY . /app/
 # Install dependencies
 RUN uv pip install --system ".[postgres]"
 
+# Health check
+HEALTHCHECK --interval=20s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:8000/health || exit 1
+
 EXPOSE 8000
 
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]
