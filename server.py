@@ -94,6 +94,43 @@ import dashboard_api
 app.include_router(dashboard_api.router)
 
 # -----------------------------------------------------------------------------
+# Embedded Autonomous Background Job Worker Daemon
+# -----------------------------------------------------------------------------
+
+def start_embedded_worker():
+    import threading
+    def _worker_loop():
+        from workers.job_runner import PipelineJobWorker
+        logger.info("Embedded Pipeline Job Worker started and polling for jobs...")
+        worker = PipelineJobWorker(worker_id="embedded_live_worker")
+        iteration = 0
+        while True:
+            try:
+                iteration += 1
+                if iteration % 60 == 0:
+                    try:
+                        reclaimed = worker.db.reclaim_expired_job_leases()
+                        if reclaimed > 0:
+                            logger.info(f"Auto-reclaimed {reclaimed} expired job leases.")
+                    except Exception:
+                        pass
+                processed = worker.process_one_job()
+                if not processed:
+                    time.sleep(5)
+            except Exception as e:
+                logger.error(f"Embedded worker error: {e}")
+                time.sleep(5)
+
+    t = threading.Thread(target=_worker_loop, daemon=True, name="EmbeddedJobWorker")
+    t.start()
+    return t
+
+if os.environ.get("RPIM_WORKER_EMBEDDED", "1") == "1" and os.environ.get("PYTEST_CURRENT_TEST") is None:
+    @app.on_event("startup")
+    def on_startup_start_worker():
+        start_embedded_worker()
+
+# -----------------------------------------------------------------------------
 # Security & Authentication Middleware
 # -----------------------------------------------------------------------------
 

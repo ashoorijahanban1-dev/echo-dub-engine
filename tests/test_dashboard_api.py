@@ -77,3 +77,29 @@ def test_dashboard_reclaim_leases():
     res = client.post("/api/v1/dashboard/recovery/reclaim-leases")
     assert res.status_code == 200
     assert res.json()["status"] == "SUCCESS"
+
+def test_root_redirect_to_dashboard():
+    res = client.get("/", follow_redirects=False)
+    assert res.status_code == 302
+    assert res.headers["location"] == "/dashboard"
+
+def test_health_endpoints():
+    res = client.get("/health")
+    assert res.status_code == 200
+    assert res.json()["status"] == "HEALTHY"
+
+def test_dashboard_ingest_course():
+    res = client.post("/api/v1/dashboard/ingest", json={
+        "url": "https://downloadly.ir/elearning/video-tutorials/docker-mastery-course/",
+        "title_fa": "آموزش جامع داکر",
+        "title_en": "Docker Mastery",
+        "voice": "Puck",
+        "style": "conversational_professional"
+    })
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "INGESTED"
+    assert "course_id" in data
+    assert "job_id" in data
+    assert data["title_fa"] == "آموزش جامع داکر"
+

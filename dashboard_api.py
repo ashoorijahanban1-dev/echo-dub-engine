@@ -7,7 +7,9 @@ and course/lesson inspection for the graphical admin console.
 import os
 import time
 import uuid
+import json
 import shutil
+import hashlib
 import logging
 from pathlib import Path
 from collections import deque
@@ -83,6 +85,13 @@ db = DualDatabaseManager()
 class TestVoiceRequest(BaseModel):
     text: str = Field(..., description="Persian text to synthesize")
     voice: Optional[str] = Field("Puck", description="Voice name (Puck, Aoede, etc.)")
+    style: Optional[str] = Field("conversational_professional", description="Dubbing style")
+
+class IngestCourseRequest(BaseModel):
+    url: str = Field(..., description="Course or video URL (Downloadly or direct video)")
+    title_fa: Optional[str] = Field(None, description="Persian title")
+    title_en: Optional[str] = Field(None, description="English title")
+    voice: Optional[str] = Field("Puck", description="Voice persona (Puck, Aoede)")
     style: Optional[str] = Field("conversational_professional", description="Dubbing style")
 
 class DiscoverUrlRequest(BaseModel):
@@ -380,6 +389,111 @@ def override_lesson_qc(lesson_id: str, req: ManualQCOverrideRequest):
 
     logging.getLogger("rpim.dashboard").info(f"Lesson {lesson_id} QC manually overridden. Enqueued UPLOAD job {upload_job_id}.")
     return {"status": "OVERRIDDEN", "lesson_id": lesson_id, "upload_job_id": upload_job_id}
+
+
+@router.post("/api/v1/dashboard/ingest")
+def ingest_course_dashboard(req: IngestCourseRequest):
+    """
+    Submits a new course or direct video for autonomous end-to-end processing.
+    Directly creates discovery and processing records, and queues the initial job.
+    """
+    url = req.url.strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="URL cannot be empty.")
+
+    from adapters.discovery import DownloadlyParser
+
+    try:
+        canonical = DownloadlyParser.canonicalize_url(url)
+    except Exception:
+        canonical = url
+
+    slug = DownloadlyParser.extract_slug(canonical)
+    title_fa = req.title_fa or req.title_en or slug
+    title_en = req.title_en or slug
+    fp = hashlib.sha256(f"{canonical}:{title_fa}".encode()).hexdigest()[:16]
+
+    disc_id = db.upsert_discovered_course(
+        url=url,
+        canonical_url=canonical,
+        slug=slug,
+        title_en=title_en,
+        title_fa=title_fa,
+        fingerprint=fp,
+        metadata={"submitted_by": "dashboard_admin", "voice": req.voice, "style": req.style}
+    )
+
+    course_id = db.create_or_update_course(
+        discovery_id=disc_id,
+        canonical_url=canonical,
+        slug=slug,
+        title_en=title_en,
+        title_fa=title_fa,
+        fingerprint=fp,
+        total_parts=1
+    )
+
+    lower_url = url.lower()
+    is_direct_video = any(lower_url.endswith(ext) for ext in [".mp4", ".mkv", ".webm", ".avi", ".mov"])
+
+    if is_direct_video:
+        lesson_id = f"les_{uuid.uuid4().hex[:12]}"
+        now = datetime.now(timezone.utc).isoformat()
+        db.processing_backend.execute(
+            """
+            INSERT INTO lessons (id, course_id, lesson_number, title_fa, title_en, status, video_source_path, created_at, updated_at)
+            VALUES (?, ?, 1, ?, ?, 'PENDING', ?, ?, ?)
+            """,
+            (lesson_id, course_id, title_fa, title_en, url, now, now)
+        )
+        job_id = db.enqueue_job(
+            course_id=course_id,
+            lesson_id=lesson_id,
+            job_type="TRANSFER",
+            idempotency_key=f"transfer:{lesson_id}"
+        )
+        job_type = "TRANSFER"
+    else:
+        job_id = db.enqueue_job(
+            course_id=course_id,
+            job_type="TRANSFER",
+            idempotency_key=f"transfer:course:{course_id}"
+        )
+        job_type = "TRANSFER"
+
+    logging.getLogger("rpim.dashboard").info(
+        f"دوره '{title_fa}' توسط ادمین در سیستم ثبت شد. جاب اولیه {job_type} با شناسه {job_id} در صف قرار گرفت."
+    )
+
+    return {
+        "status": "INGESTED",
+        "course_id": course_id,
+        "slug": slug,
+        "title_fa": title_fa,
+        "job_id": job_id,
+        "job_type": job_type
+    }
+
+
+@router.get("/api/v1/dashboard/lessons/{lesson_id}/audio")
+def stream_lesson_audio(lesson_id: str):
+    """Streams synthesized Persian audio for a specific lesson."""
+    lesson_dir = Path(config.STORAGE_DIR) / "lessons" / lesson_id
+    audio_file = lesson_dir / "persian_audio.wav"
+    if not audio_file.exists():
+        matches = list((Path(config.STORAGE_DIR) / "lessons").glob(f"**/{lesson_id}/**/persian_audio.wav"))
+        if matches:
+            audio_file = matches[0]
+
+    if not audio_file.exists():
+        raise HTTPException(status_code=404, detail="Persian audio file not found for this lesson.")
+
+    def iterfile():
+        with open(audio_file, "rb") as f:
+            while chunk := f.read(65536):
+                yield chunk
+
+    return StreamingResponse(iterfile(), media_type="audio/wav")
 
 
 @router.get("/dashboard", response_class=HTMLResponse)

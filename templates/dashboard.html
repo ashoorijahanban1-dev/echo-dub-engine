@@ -233,13 +233,17 @@
 
             <!-- Global Action Toolbar Right Side -->
             <div class="mr-auto flex items-center gap-2">
+                <button onclick="openIngestModal()" class="text-xs px-3.5 py-2 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-semibold flex items-center gap-1.5 transition shadow-lg shadow-brand-600/30">
+                    <i class="fa-solid fa-cloud-arrow-up text-xs"></i>
+                    <span>+ ثبت دوره / ویدیوی جدید</span>
+                </button>
                 <button onclick="triggerReclaimLeases()" class="text-xs px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-amber-300 border border-amber-500/20 flex items-center gap-1.5 transition">
                     <i class="fa-solid fa-lock-open text-xs"></i>
-                    <span>آزادسازی قفل‌های معلق</span>
+                    <span>آزادسازی قفل‌ها</span>
                 </button>
                 <button onclick="triggerProcessOneJob()" class="text-xs px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-medium flex items-center gap-1.5 transition shadow-lg shadow-emerald-600/20">
                     <i class="fa-solid fa-play text-xs"></i>
-                    <span>اجرای فوری ۱ جاب ورکر</span>
+                    <span>پردازش ۱ جاب</span>
                 </button>
             </div>
         </div>
@@ -776,8 +780,58 @@
 
         // Play Lesson Audio
         function playLessonAudio(lessonId) {
-            const audio = new Audio(`/api/v1/dashboard/audio-preview/${lessonId}/persian_audio.wav`);
-            audio.play();
+            const audio = new Audio(`/api/v1/dashboard/lessons/${lessonId}/audio`);
+            audio.play().catch(err => {
+                alert("فایل صوتی دوبله هنوز آماده نیست یا در حال پردازش است.");
+            });
+        }
+
+        // Course Ingest Modal
+        function openIngestModal() {
+            document.getElementById('ingestModal').classList.remove('hidden');
+        }
+        function closeIngestModal() {
+            document.getElementById('ingestModal').classList.add('hidden');
+        }
+        async function submitNewCourse() {
+            const url = document.getElementById('ingestUrl').value.trim();
+            if (!url) {
+                alert('لطفاً آدرس لینک دوره یا ویدیو را وارد کنید.');
+                return;
+            }
+            const title_fa = document.getElementById('ingestTitleFa').value.trim();
+            const title_en = document.getElementById('ingestTitleEn').value.trim();
+            const voice = document.getElementById('ingestVoice').value;
+            const style = document.getElementById('ingestStyle').value;
+            const btn = document.getElementById('btnSubmitIngest');
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> در حال ثبت و ایجاد جاب...';
+
+            try {
+                const res = await fetch('/api/v1/dashboard/ingest', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url, title_fa, title_en, voice, style })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'خطا در ثبت دوره');
+
+                alert(`دوره با موفقیت ثبت شد!\nشناسه دوره: ${data.course_id}\nجاب اولیه (${data.job_type}) با شناسه ${data.job_id} به ورکر اختصاص داده شد.`);
+                closeIngestModal();
+                document.getElementById('ingestUrl').value = '';
+                document.getElementById('ingestTitleFa').value = '';
+                document.getElementById('ingestTitleEn').value = '';
+                fetchOverview();
+                fetchCourses();
+                fetchJobs();
+                fetchLogs();
+            } catch (err) {
+                alert('خطا: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-play"></i> <span>شروع فرآیند دوبله و ارسال خودکار</span>';
+            }
         }
 
         // Manual QC Override
@@ -848,5 +902,68 @@
         fetchCourses();
         fetchLogs();
     </script>
+    <!-- Modal: Ingest New Course / Video -->
+    <div id="ingestModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="glass-panel w-full max-w-lg p-6 rounded-3xl border border-zinc-700/80 shadow-2xl relative flex flex-col gap-4">
+            <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-lg bg-brand-500/10 text-brand-400 flex items-center justify-center">
+                        <i class="fa-solid fa-sparkles"></i>
+                    </div>
+                    <h3 class="text-sm font-bold text-white">ثبت و شروع خودکار دوبله هوشمند</h3>
+                </div>
+                <button onclick="closeIngestModal()" class="text-zinc-500 hover:text-white transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div class="flex flex-col gap-3">
+                <div>
+                    <label class="text-xs text-zinc-400 mb-1 block">لینک دوره یا ویدیو (Downloadly یا فایل مستقیم MP4):</label>
+                    <input id="ingestUrl" type="url" placeholder="https://downloadly.ir/... یا https://example.com/lesson.mp4" class="w-full bg-zinc-900/90 border border-zinc-700 rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-brand-500 transition dir-ltr" />
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs text-zinc-400 mb-1 block">عنوان فارسی (اختیاری):</label>
+                        <input id="ingestTitleFa" type="text" placeholder="مثال: آموزش کامل داکر" class="w-full bg-zinc-900/90 border border-zinc-700 rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-brand-500 transition" />
+                    </div>
+                    <div>
+                        <label class="text-xs text-zinc-400 mb-1 block">عنوان انگلیسی (اختیاری):</label>
+                        <input id="ingestTitleEn" type="text" placeholder="Docker Mastery Course" class="w-full bg-zinc-900/90 border border-zinc-700 rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-brand-500 transition dir-ltr" />
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs text-zinc-400 mb-1 block">گوینده هوش مصنوعی:</label>
+                        <select id="ingestVoice" class="w-full bg-zinc-900/90 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-brand-500 transition">
+                            <option value="Puck">مرد: Puck (آموزش‌محور، شفاف و رسا)</option>
+                            <option value="Aoede">زن: Aoede (صمیمی و آرام)</option>
+                            <option value="Fenrir">مرد: Fenrir (رسمی و مستند)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs text-zinc-400 mb-1 block">سبک و لحن گفتار:</label>
+                        <select id="ingestStyle" class="w-full bg-zinc-900/90 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-brand-500 transition">
+                            <option value="conversational_professional">آموزشی روان و تخصصی</option>
+                            <option value="formal">رسمی و آکادمیک</option>
+                            <option value="friendly">خودمانی و محاوره‌ای</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 pt-2 border-t border-zinc-800">
+                <button onclick="closeIngestModal()" class="px-4 py-2 rounded-xl text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition">
+                    انصراف
+                </button>
+                <button id="btnSubmitIngest" onclick="submitNewCourse()" class="px-5 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-brand-600 to-emerald-600 hover:from-brand-500 hover:to-emerald-500 text-white transition flex items-center gap-1.5 shadow-lg shadow-brand-600/30">
+                    <i class="fa-solid fa-play"></i>
+                    <span>شروع فرآیند دوبله و ارسال خودکار</span>
+                </button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
