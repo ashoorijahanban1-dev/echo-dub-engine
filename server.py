@@ -17,7 +17,7 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, Request, Response, HTTPException, Header, Depends, status
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -231,9 +231,12 @@ class CommitVisibilityRequest(BaseModel):
 
 from fastapi.responses import RedirectResponse
 
-@app.get("/", include_in_schema=False)
+@app.get("/", include_in_schema=False, response_class=HTMLResponse)
 def root_index():
-    return RedirectResponse(url="/dashboard", status_code=302)
+    html_path = Path(__file__).resolve().parent / "templates" / "dashboard.html"
+    if html_path.exists():
+        return HTMLResponse(html_path.read_text(encoding="utf-8"), status_code=200)
+    return HTMLResponse("<h1>RPIM Dashboard</h1>", status_code=200)
 
 @app.get("/health")
 @app.get("/api/v1/health")

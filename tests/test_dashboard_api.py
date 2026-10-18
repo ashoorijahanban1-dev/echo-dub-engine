@@ -78,10 +78,10 @@ def test_dashboard_reclaim_leases():
     assert res.status_code == 200
     assert res.json()["status"] == "SUCCESS"
 
-def test_root_redirect_to_dashboard():
-    res = client.get("/", follow_redirects=False)
-    assert res.status_code == 302
-    assert res.headers["location"] == "/dashboard"
+def test_root_index_renders_dashboard():
+    res = client.get("/")
+    assert res.status_code == 200
+    assert "text/html" in res.headers["content-type"]
 
 def test_health_endpoints():
     res = client.get("/health")
