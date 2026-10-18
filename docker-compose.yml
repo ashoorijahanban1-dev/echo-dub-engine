@@ -1,0 +1,120 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: rpim-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-coolify}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_secure_db_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init_postgres_dbs.sql:/docker-entrypoint-initdb.d/init_postgres_dbs.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-coolify}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - rpim-net
+
+  engine-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rpim-engine-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - ${ENV_FILE:-.env.example}
+    environment:
+      - DISCOVERY_DB_URL=postgresql://${POSTGRES_USER:-coolify}:${POSTGRES_PASSWORD:-change_me_secure_db_password}@postgres:5432/rpim_discovery
+      - PROCESSING_DB_URL=postgresql://${POSTGRES_USER:-coolify}:${POSTGRES_PASSWORD:-change_me_secure_db_password}@postgres:5432/rpim_processing
+    ports:
+      - "8000:8000"
+    volumes:
+      - storage_data:/app/storage
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/v1/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - rpim-net
+
+  engine-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rpim-engine-worker
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      engine-api:
+        condition: service_healthy
+    env_file:
+      - ${ENV_FILE:-.env.example}
+    environment:
+      - DISCOVERY_DB_URL=postgresql://${POSTGRES_USER:-coolify}:${POSTGRES_PASSWORD:-change_me_secure_db_password}@postgres:5432/rpim_discovery
+      - PROCESSING_DB_URL=postgresql://${POSTGRES_USER:-coolify}:${POSTGRES_PASSWORD:-change_me_secure_db_password}@postgres:5432/rpim_processing
+    volumes:
+      - storage_data:/app/storage
+    command: ["python", "-c", "import time; from workers.job_runner import PipelineJobWorker; w = PipelineJobWorker(); print('Worker started'); \nwhile True: w.process_one_job(); time.sleep(5)"]
+    networks:
+      - rpim-net
+
+  n8n:
+    image: n8nio/n8n:1.80.0
+    container_name: rpim-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=n8n.rpim.ir
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=https
+      - NODE_ENV=production
+      - WEBHOOK_URL=https://n8n.rpim.ir/
+      - US_ENGINE_BASE_URL=http://engine-api:8000
+      - IRAN_RELAY_BASE_URL=${IRAN_RELAY_BASE_URL:-https://rpim.ir}
+      - INTERNAL_API_SECRET=${INTERNAL_API_SECRET}
+      - RELAY_AUTH_SECRET=${RELAY_AUTH_SECRET}
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      engine-api:
+        condition: service_healthy
+    networks:
+      - rpim-net
+
+  iran-relay:
+    build:
+      context: .
+      dockerfile: Dockerfile.relay
+    container_name: rpim-iran-relay
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - RELAY_AUTH_SECRET=${RELAY_AUTH_SECRET}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - rpim-net
+
+volumes:
+  postgres_data:
+  storage_data:
+  n8n_data:
+
+networks:
+  rpim-net:
+    driver: bridge

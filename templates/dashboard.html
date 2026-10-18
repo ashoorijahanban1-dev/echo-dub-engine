@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RPIM TV | کنسول مدیریت و مانیتورینگ پایپ‌لاین</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { 50: '#f5f3ff', 500: '#8b5cf6', 600: '#7c3aed', 700: '#6d28d9', 900: '#4c1d95' },
+                        dark: { 800: '#18181b', 900: '#09090b', 950: '#040406' }
+                    },
+                    fontFamily: {
+                        sans: ['Vazirmatn', 'Tahoma', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap');
+        body { font-family: 'Vazirmatn', Tahoma, sans-serif; }
+        .glass-panel {
+            background: rgba(24, 24, 27, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #09090b; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #27272a; border-radius: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+    </style>
+</head>
+<body class="bg-dark-950 text-zinc-100 min-h-screen flex flex-col antialiased selection:bg-brand-500 selection:text-white">
+
+    <!-- Top Navigation Header -->
+    <header class="border-b border-zinc-800/80 bg-dark-900/90 sticky top-0 z-50 backdrop-blur-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-brand-500/20">
+                    <i class="fa-solid fa-microphone-lines text-white text-lg"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="font-bold text-lg text-white tracking-tight">RPIM TV Engine</h1>
+                        <span id="envBadge" class="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">v2.0 Active</span>
+                    </div>
+                    <p class="text-xs text-zinc-400">کنسول مدیریت پایپ‌لاین دوبله، استریم و انتشار خودکار</p>
+                </div>
+            </div>
+
+            <!-- Header Quick Actions & Realtime Clock -->
+            <div class="flex items-center gap-4">
+                <div class="hidden md:flex items-center gap-3 px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs">
+                    <span class="flex h-2 w-2 relative">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <span id="clockDisplay" class="font-mono text-zinc-300">--:--:--</span>
+                    <span class="text-zinc-600">|</span>
+                    <button onclick="fetchOverview(); fetchCourses(); fetchLogs();" title="تازه‌سازی فوری" class="text-zinc-400 hover:text-white transition">
+                        <i class="fa-solid fa-rotate text-xs"></i>
+                    </button>
+                    <label class="flex items-center gap-1.5 cursor-pointer text-zinc-400 hover:text-zinc-200">
+                        <input type="checkbox" id="autoRefreshToggle" checked class="rounded border-zinc-700 text-brand-600 focus:ring-0 w-3.5 h-3.5 bg-zinc-800">
+                        <span>زنده</span>
+                    </label>
+                </div>
+
+                <a href="/api/v1/health" target="_blank" class="text-xs px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 flex items-center gap-1.5 transition">
+                    <i class="fa-solid fa-heart-pulse text-emerald-400"></i>
+                    <span>Healthcheck</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full flex flex-col gap-6">
+
+        <!-- System Health Pill Banner -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div class="glass-panel p-3 rounded-xl flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center text-sm">
+                    <i class="fa-solid fa-server"></i>
+                </div>
+                <div class="overflow-hidden">
+                    <p class="text-[11px] text-zinc-400 truncate">سرور آمریکا (موتور)</p>
+                    <p id="usServerStatus" class="text-xs font-semibold text-emerald-400 flex items-center gap-1">
+                        <i class="fa-solid fa-circle text-[7px]"></i> آنلاین (Port 8000)
+                    </p>
+                </div>
+            </div>
+
+            <div class="glass-panel p-3 rounded-xl flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center text-sm">
+                    <i class="fa-solid fa-network-wired"></i>
+                </div>
+                <div class="overflow-hidden">
+                    <p class="text-[11px] text-zinc-400 truncate">رله ایران (Egress)</p>
+                    <p id="iranRelayStatus" class="text-xs font-semibold text-emerald-400 flex items-center gap-1">
+                        <i class="fa-solid fa-circle text-[7px]"></i> فعال (78.157.51.14)
+                    </p>
+                </div>
+            </div>
+
+            <div class="glass-panel p-3 rounded-xl flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-sm">
+                    <i class="fa-solid fa-database"></i>
+                </div>
+                <div class="overflow-hidden">
+                    <p class="text-[11px] text-zinc-400 truncate">پایگاه‌های داده</p>
+                    <p id="dbStatus" class="text-xs font-semibold text-emerald-400 flex items-center gap-1">
+                        <i class="fa-solid fa-circle text-[7px]"></i> دوگانه پایدار
+                    </p>
+                </div>
+            </div>
+
+            <div class="glass-panel p-3 rounded-xl flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center text-sm">
+                    <i class="fa-solid fa-key"></i>
+                </div>
+                <div class="overflow-hidden">
+                    <p class="text-[11px] text-zinc-400 truncate">کلیدهای Gemini</p>
+                    <p id="geminiKeysCount" class="text-xs font-semibold text-purple-300">۶ کلید فعال (Pool)</p>
+                </div>
+            </div>
+
+            <div class="glass-panel p-3 rounded-xl flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center text-sm">
+                    <i class="fa-solid fa-hard-drive"></i>
+                </div>
+                <div class="overflow-hidden">
+                    <p class="text-[11px] text-zinc-400 truncate">فضای دیسک آزاد</p>
+                    <p id="diskFree" class="text-xs font-semibold text-indigo-300">-- GB</p>
+                </div>
+            </div>
+
+            <div class="glass-panel p-3 rounded-xl flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-400 flex items-center justify-center text-sm">
+                    <i class="fa-solid fa-coins"></i>
+                </div>
+                <div class="overflow-hidden">
+                    <p class="text-[11px] text-zinc-400 truncate">هزینه کل هوش مصنوعی</p>
+                    <p id="totalCostUsd" class="text-xs font-semibold text-rose-300">$0.0000</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- KPI Statistic Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="glass-panel p-5 rounded-2xl relative overflow-hidden group">
+                <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-blue-500/10 rounded-full blur-xl group-hover:bg-blue-500/20 transition"></div>
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-medium text-zinc-400">دوره‌های کشف‌شده</span>
+                    <span class="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center text-xs">
+                        <i class="fa-solid fa-compass"></i>
+                    </span>
+                </div>
+                <div class="flex items-baseline gap-2">
+                    <span id="kpiDiscovered" class="text-2xl font-extrabold text-white">0</span>
+                    <span class="text-xs text-zinc-500">دوره در رله</span>
+                </div>
+            </div>
+
+            <div class="glass-panel p-5 rounded-2xl relative overflow-hidden group">
+                <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-amber-500/10 rounded-full blur-xl group-hover:bg-amber-500/20 transition"></div>
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-medium text-zinc-400">جاب‌های فعال در صف</span>
+                    <span class="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center text-xs">
+                        <i class="fa-solid fa-gears"></i>
+                    </span>
+                </div>
+                <div class="flex items-baseline gap-2">
+                    <span id="kpiActiveJobs" class="text-2xl font-extrabold text-amber-300">0</span>
+                    <span class="text-xs text-zinc-500">جاب در صف ورکر</span>
+                </div>
+            </div>
+
+            <div class="glass-panel p-5 rounded-2xl relative overflow-hidden group">
+                <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl group-hover:bg-emerald-500/20 transition"></div>
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-medium text-zinc-400">دروس تاییدشده (QC Passed)</span>
+                    <span class="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-xs">
+                        <i class="fa-solid fa-circle-check"></i>
+                    </span>
+                </div>
+                <div class="flex items-baseline gap-2">
+                    <span id="kpiQcPassed" class="text-2xl font-extrabold text-emerald-300">0</span>
+                    <span class="text-xs text-zinc-500">درس آماده انتشار</span>
+                </div>
+            </div>
+
+            <div class="glass-panel p-5 rounded-2xl relative overflow-hidden group">
+                <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-rose-500/10 rounded-full blur-xl group-hover:bg-rose-500/20 transition"></div>
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-medium text-zinc-400">نیازمند بازبینی ادمین</span>
+                    <span class="w-7 h-7 rounded-lg bg-rose-500/10 text-rose-400 flex items-center justify-center text-xs">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                    </span>
+                </div>
+                <div class="flex items-baseline gap-2">
+                    <span id="kpiQcFailed" class="text-2xl font-extrabold text-rose-400">0</span>
+                    <span class="text-xs text-zinc-500">درس متوقف‌شده</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="flex items-center gap-2 border-b border-zinc-800 pb-2">
+            <button onclick="switchTab('tab-courses')" id="btn-tab-courses" class="tab-btn px-4 py-2 rounded-xl text-sm font-medium bg-brand-600 text-white flex items-center gap-2 transition shadow-lg shadow-brand-600/20">
+                <i class="fa-solid fa-book-open"></i>
+                <span>دوره‌ها و دروس</span>
+            </button>
+            <button onclick="switchTab('tab-voice')" id="btn-tab-voice" class="tab-btn px-4 py-2 rounded-xl text-sm font-medium bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white flex items-center gap-2 transition border border-zinc-800">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                <span>استودیوی تست صدا</span>
+            </button>
+            <button onclick="switchTab('tab-jobs')" id="btn-tab-jobs" class="tab-btn px-4 py-2 rounded-xl text-sm font-medium bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white flex items-center gap-2 transition border border-zinc-800">
+                <i class="fa-solid fa-list-check"></i>
+                <span>صف پردازش (Jobs)</span>
+            </button>
+            <button onclick="switchTab('tab-logs')" id="btn-tab-logs" class="tab-btn px-4 py-2 rounded-xl text-sm font-medium bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white flex items-center gap-2 transition border border-zinc-800">
+                <i class="fa-solid fa-terminal"></i>
+                <span>کنسول زنده لاگ‌ها</span>
+            </button>
+
+            <!-- Global Action Toolbar Right Side -->
+            <div class="mr-auto flex items-center gap-2">
+                <button onclick="triggerReclaimLeases()" class="text-xs px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-amber-300 border border-amber-500/20 flex items-center gap-1.5 transition">
+                    <i class="fa-solid fa-lock-open text-xs"></i>
+                    <span>آزادسازی قفل‌های معلق</span>
+                </button>
+                <button onclick="triggerProcessOneJob()" class="text-xs px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-medium flex items-center gap-1.5 transition shadow-lg shadow-emerald-600/20">
+                    <i class="fa-solid fa-play text-xs"></i>
+                    <span>اجرای فوری ۱ جاب ورکر</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- TAB 1: Courses & Lessons Explorer -->
+        <!-- ================================================================= -->
+        <section id="tab-courses" class="tab-content flex flex-col gap-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-base font-bold text-white">مدیریت دوره‌های آموزشی و کنترل کیفیت دروس</h2>
+                    <p class="text-xs text-zinc-400">مشاهده فصول، متادیتای دروس، گوش دادن آنلاین به صدای دوبله، و تایید دستی کیفیت</p>
+                </div>
+            </div>
+
+            <!-- Courses Container -->
+            <div id="coursesListContainer" class="flex flex-col gap-4">
+                <div class="glass-panel p-8 rounded-2xl text-center text-zinc-400">
+                    <i class="fa-solid fa-spinner fa-spin text-2xl text-brand-500 mb-2"></i>
+                    <p class="text-sm">در حال دریافت لیست دوره‌ها و فصول...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================================================================= -->
+        <!-- TAB 2: Voice Studio & Prompt Tester -->
+        <!-- ================================================================= -->
+        <section id="tab-voice" class="tab-content hidden flex flex-col gap-4">
+            <div class="glass-panel p-6 rounded-2xl flex flex-col gap-5">
+                <div>
+                    <h2 class="text-base font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-headphones text-brand-400"></i>
+                        <span>استودیوی تست زنده صدای Google Gemini TTS</span>
+                    </h2>
+                    <p class="text-xs text-zinc-400 mt-1">تایپ متن دلخواه برای اعتبارسنجی لحن محاوره‌ای تدریس، شمرده‌شمرده بودن، و شنیدن فوری صدا در مرورگر</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="md:col-span-2 flex flex-col gap-2">
+                        <label class="text-xs text-zinc-300 font-medium">متن فارسی آزمایشی:</label>
+                        <textarea id="voiceTestInput" rows="4" class="w-full bg-dark-900 border border-zinc-800 rounded-xl p-3 text-sm text-zinc-100 focus:outline-none focus:border-brand-500 transition resize-none" placeholder="مثال: در این جلسه می‌خواهیم یاد بگیریم که چطور کانتینر داکر را به درستی اجرا کنیم و نکته اینجاست که..."></textarea>
+                    </div>
+
+                    <div class="flex flex-col gap-4 bg-dark-900/60 p-4 rounded-xl border border-zinc-800/80">
+                        <div>
+                            <label class="text-xs text-zinc-300 font-medium mb-1 block">انتخاب صدا (Google Voice):</label>
+                            <select id="voiceSelect" class="w-full bg-dark-950 border border-zinc-800 rounded-lg p-2 text-xs text-zinc-200">
+                                <option value="Puck" selected>Puck (صدای مردانه رادیویی و گرم - استاندارد طلایی)</option>
+                                <option value="Aoede">Aoede (صدای زنانه شیوا و آرام)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="text-xs text-zinc-300 font-medium mb-1 block">سبک لحن دوبله:</label>
+                            <select id="styleSelect" class="w-full bg-dark-950 border border-zinc-800 rounded-lg p-2 text-xs text-zinc-200">
+                                <option value="conversational_professional" selected>محاوره‌ای استاد دانشگاه (Conversational)</option>
+                                <option value="formal">رسمی و کتابی (Formal)</option>
+                            </select>
+                        </div>
+
+                        <button onclick="testVoiceSynthesis()" id="btnSynthTest" class="mt-auto w-full py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-medium text-xs flex items-center justify-center gap-2 transition shadow-lg shadow-brand-500/20">
+                            <i class="fa-solid fa-waveform-lines"></i>
+                            <span>تولید صدای نمونه (Synthesize)</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Test Result Audio Player Container -->
+                <div id="voiceResultBox" class="hidden flex flex-col gap-3 p-4 rounded-xl bg-dark-900 border border-brand-500/30">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-emerald-400 font-medium flex items-center gap-1.5">
+                            <i class="fa-solid fa-circle-check"></i> صدا با موفقیت تولید شد
+                        </span>
+                        <span id="voiceResultCost" class="text-zinc-400 font-mono">هزینه: $0.00012</span>
+                    </div>
+
+                    <div class="text-xs bg-dark-950 p-2.5 rounded-lg border border-zinc-800/60">
+                        <span class="text-zinc-500 block mb-0.5">متن بازنویسی‌شده ارسالی به هوش مصنوعی:</span>
+                        <p id="voiceResultRewritten" class="text-zinc-200 font-medium"></p>
+                    </div>
+
+                    <audio id="voiceResultAudio" controls class="w-full mt-1 h-9 rounded-lg bg-zinc-800"></audio>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================================================================= -->
+        <!-- TAB 3: Job Queue Monitor -->
+        <!-- ================================================================= -->
+        <section id="tab-jobs" class="tab-content hidden flex flex-col gap-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-base font-bold text-white">صف جاب‌های پس‌زمینه (Worker Queue)</h2>
+                    <p class="text-xs text-zinc-400">وضعیت اجرای مراحل ۶گانه (TRANSFER, EXTRACTION, INVENTORY, DUBBING, UPLOAD, FINALIZE)</p>
+                </div>
+                <button onclick="fetchJobs()" class="text-xs px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-lg text-zinc-300 transition">
+                    <i class="fa-solid fa-rotate-right ml-1"></i> تازه‌سازی صف
+                </button>
+            </div>
+
+            <div class="glass-panel rounded-2xl overflow-hidden">
+                <div class="overflow-x-auto custom-scroll">
+                    <table class="w-full text-right text-xs">
+                        <thead class="bg-zinc-900/80 border-b border-zinc-800 text-zinc-400">
+                            <tr>
+                                <th class="p-3 font-medium">شناسه جاب</th>
+                                <th class="p-3 font-medium">نوع مرحله</th>
+                                <th class="p-3 font-medium">شناسه درس / دوره</th>
+                                <th class="p-3 font-medium">وضعیت</th>
+                                <th class="p-3 font-medium">پیشرفت</th>
+                                <th class="p-3 font-medium">تلاش‌ها</th>
+                                <th class="p-3 font-medium">زمان ثبت</th>
+                            </tr>
+                        </thead>
+                        <tbody id="jobsTableBody" class="divide-y divide-zinc-800/60">
+                            <tr>
+                                <td colspan="7" class="p-6 text-center text-zinc-500">در حال بارگذاری جاب‌ها...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================================================================= -->
+        <!-- TAB 4: Live Logs Console -->
+        <!-- ================================================================= -->
+        <section id="tab-logs" class="tab-content hidden flex flex-col gap-4 flex-1">
+            <div class="glass-panel p-4 rounded-2xl flex flex-col gap-3">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-base font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-terminal text-brand-400"></i>
+                            <span>کنسول زنده لاگ‌های سیستم</span>
+                        </h2>
+                        <span id="logsCountBadge" class="text-[11px] font-mono px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">0 خط</span>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <!-- Search in logs -->
+                        <div class="relative">
+                            <input type="text" id="logSearchInput" oninput="fetchLogs()" placeholder="جستجو در لاگ‌ها..." class="bg-dark-900 border border-zinc-800 rounded-lg pr-7 pl-2.5 py-1 text-xs text-zinc-200 focus:outline-none focus:border-brand-500 w-36 sm:w-48">
+                            <i class="fa-solid fa-magnifying-glass absolute right-2.5 top-2 text-[10px] text-zinc-500"></i>
+                        </div>
+
+                        <!-- Level filter -->
+                        <select id="logLevelSelect" onchange="fetchLogs()" class="bg-dark-900 border border-zinc-800 rounded-lg px-2 py-1 text-xs text-zinc-300">
+                            <option value="ALL">همه سطوح</option>
+                            <option value="INFO">فقط INFO</option>
+                            <option value="WARNING">فقط WARNING</option>
+                            <option value="ERROR">فقط ERROR</option>
+                        </select>
+
+                        <!-- Pause / Resume log stream -->
+                        <button onclick="toggleLogPause()" id="btnLogPause" class="text-xs px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition">
+                            <i class="fa-solid fa-pause ml-1"></i> توقف دریافت
+                        </button>
+
+                        <!-- Clear logs -->
+                        <button onclick="clearLogs()" class="text-xs px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition" title="پاکسازی صفحه">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+
+                        <!-- Download log -->
+                        <button onclick="downloadLogs()" class="text-xs px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition" title="دانلود لاگ متنی">
+                            <i class="fa-solid fa-download"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Terminal Log Viewport -->
+                <div id="logsTerminal" class="h-96 bg-dark-950 rounded-xl p-3 font-mono text-[11px] leading-relaxed overflow-y-auto custom-scroll border border-zinc-900 space-y-1">
+                    <p class="text-zinc-600">// کنسول لاگ در حال بارگذاری رویدادها...</p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-zinc-800/80 bg-dark-900/60 py-4 mt-auto">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-xs text-zinc-500 flex flex-wrap items-center justify-between gap-2">
+            <span>سامانه دوبله و انتشار هوشمند دوره‌های آموزشی RPIM TV — نسخه v2.0 عملیاتی</span>
+            <span class="flex items-center gap-1.5 font-mono text-[11px]">
+                <i class="fa-solid fa-shield-halved text-emerald-400"></i> Fencing & Dialect Safe
+            </span>
+        </div>
+    </footer>
+
+    <!-- Frontend Dashboard JavaScript Engine -->
+    <script>
+        let isLogPaused = false;
+        let lastLogs = [];
+
+        // Clock Update
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clockDisplay').innerText = now.toLocaleTimeString('fa-IR');
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // Tab Switching
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('bg-brand-600', 'text-white', 'shadow-lg', 'shadow-brand-600/20');
+                btn.classList.add('bg-zinc-900', 'text-zinc-400', 'hover:bg-zinc-800', 'hover:text-white', 'border', 'border-zinc-800');
+            });
+
+            document.getElementById(tabId).classList.remove('hidden');
+            const activeBtn = document.getElementById('btn-' + tabId);
+            activeBtn.classList.add('bg-brand-600', 'text-white', 'shadow-lg', 'shadow-brand-600/20');
+            activeBtn.classList.remove('bg-zinc-900', 'text-zinc-400', 'hover:bg-zinc-800', 'border', 'border-zinc-800');
+
+            if (tabId === 'tab-jobs') fetchJobs();
+            if (tabId === 'tab-logs') fetchLogs();
+            if (tabId === 'tab-courses') fetchCourses();
+        }
+
+        // Fetch Overview Stats
+        async function fetchOverview() {
+            try {
+                const res = await fetch('/api/v1/dashboard/overview');
+                const data = await res.json();
+                
+                const m = data.metrics;
+                document.getElementById('kpiDiscovered').innerText = m.courses_discovered;
+                document.getElementById('kpiActiveJobs').innerText = (m.jobs_active + m.jobs_queued);
+                document.getElementById('kpiQcPassed').innerText = m.lessons_qc_passed;
+                document.getElementById('kpiQcFailed').innerText = m.lessons_qc_failed;
+                
+                document.getElementById('diskFree').innerText = `${m.disk_free_gb} GB آزاد`;
+                document.getElementById('totalCostUsd').innerText = `$${m.total_cost_usd.toFixed(4)}`;
+                document.getElementById('geminiKeysCount').innerText = `${m.gemini_keys_count} کلید فعال (${m.default_voice})`;
+                
+                if (data.env === 'production') {
+                    document.getElementById('envBadge').className = 'text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20';
+                    document.getElementById('envBadge').innerText = 'PROD v2.0';
+                }
+            } catch (err) {
+                console.error("Overview fetch error:", err);
+            }
+        }
+
+        // Fetch Courses & Lessons Hierarchical List
+        async function fetchCourses() {
+            try {
+                const res = await fetch('/api/v1/dashboard/courses');
+                const data = await res.json();
+                const container = document.getElementById('coursesListContainer');
+
+                if (!data.courses || data.courses.length === 0) {
+                    container.innerHTML = `
+                        <div class="glass-panel p-10 rounded-2xl text-center text-zinc-400">
+                            <i class="fa-solid fa-folder-open text-3xl mb-3 text-zinc-600"></i>
+                            <p class="font-medium">هنوز هیچ دوره‌ای در دیتابیس ثبت نشده است.</p>
+                            <p class="text-xs text-zinc-500 mt-1">از طریق وب‌هوک کشف دوره یا رله ایران، دوره‌های جدید به این بخش اضافه می‌شوند.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                let html = '';
+                data.courses.forEach((c, idx) => {
+                    const statusClass = c.status === 'EXTRACTED' || c.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+                    
+                    html += `
+                        <div class="glass-panel rounded-2xl overflow-hidden border border-zinc-800">
+                            <!-- Course Header Bar -->
+                            <div class="p-4 bg-zinc-900/60 flex flex-wrap items-center justify-between gap-3 cursor-pointer select-none" onclick="toggleAccordion('course-acc-${c.id}')">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-xl bg-zinc-800 flex items-center justify-center text-zinc-300 font-bold text-sm">
+                                        #${idx + 1}
+                                    </div>
+                                    <div>
+                                        <div class="flex items-center gap-2">
+                                            <h3 class="font-bold text-sm text-white">${c.title_fa || c.title_en || c.slug}</h3>
+                                            <span class="text-[10px] px-2 py-0.5 rounded-full border ${statusClass}">${c.status}</span>
+                                        </div>
+                                        <p class="text-xs text-zinc-400 font-mono mt-0.5">${c.slug} | پارت‌ها: ${c.total_parts} | درس‌ها: ${c.total_lessons}</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xs text-zinc-400">مشاهده فصول و دروس</span>
+                                    <i id="acc-icon-course-acc-${c.id}" class="fa-solid fa-chevron-down text-xs text-zinc-400 transition-transform"></i>
+                                </div>
+                            </div>
+
+                            <!-- Chapters & Lessons Container (Hidden by default) -->
+                            <div id="course-acc-${c.id}" class="hidden p-4 border-t border-zinc-800/80 bg-dark-950/40 space-y-4">
+                    `;
+
+                    if (!c.chapters || c.chapters.length === 0) {
+                        html += `<p class="text-xs text-zinc-500 text-center py-2">هنوز فصلی برای این دوره استخراج نشده است.</p>`;
+                    } else {
+                        c.chapters.forEach(ch => {
+                            html += `
+                                <div class="rounded-xl border border-zinc-800/80 bg-dark-900/40 p-3">
+                                    <div class="text-xs font-bold text-zinc-300 mb-2 flex items-center gap-2">
+                                        <i class="fa-solid fa-folder text-brand-400"></i>
+                                        <span>${ch.title_fa || ch.title_en || 'فصل ' + ch.order_index}</span>
+                                    </div>
+                                    <div class="space-y-2">
+                            `;
+
+                            ch.lessons.forEach(l => {
+                                let qcBadge = '';
+                                if (l.status === 'QC_PASSED') {
+                                    qcBadge = '<span class="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px]">QC تایید شد</span>';
+                                } else if (l.status === 'QC_FAILED') {
+                                    qcBadge = '<span class="px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 text-[10px]">QC رد شد</span>';
+                                } else {
+                                    qcBadge = `<span class="px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 text-[10px]">${l.status}</span>`;
+                                }
+
+                                const audioBtn = l.has_persian_audio ? `
+                                    <button onclick="playLessonAudio('${l.id}')" class="px-2.5 py-1 rounded-lg bg-brand-600/20 hover:bg-brand-600/30 text-brand-300 text-[11px] flex items-center gap-1 transition">
+                                        <i class="fa-solid fa-play text-[9px]"></i> شنیدن صدا
+                                    </button>
+                                ` : '';
+
+                                const overrideBtn = l.status === 'QC_FAILED' ? `
+                                    <button onclick="overrideLessonQc('${l.id}')" class="px-2.5 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 text-[11px] flex items-center gap-1 transition">
+                                        <i class="fa-solid fa-check text-[9px]"></i> تایید دستی QC
+                                    </button>
+                                ` : '';
+
+                                html += `
+                                    <div class="flex items-center justify-between p-2 rounded-lg bg-dark-950/80 border border-zinc-800/40 text-xs">
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-zinc-500 font-mono">#${l.lesson_number}</span>
+                                            <span class="font-medium text-zinc-200">${l.title_fa || l.title_en || 'درس ' + l.lesson_number}</span>
+                                            ${qcBadge}
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            ${audioBtn}
+                                            ${overrideBtn}
+                                        </div>
+                                    </div>
+                                `;
+                            });
+
+                            html += `
+                                    </div>
+                                </div>
+                            `;
+                        });
+                    }
+
+                    html += `
+                            </div>
+                        </div>
+                    `;
+                });
+
+                container.innerHTML = html;
+            } catch (err) {
+                console.error("Courses fetch error:", err);
+            }
+        }
+
+        // Accordion Toggle
+        function toggleAccordion(id) {
+            const el = document.getElementById(id);
+            const icon = document.getElementById('acc-icon-' + id);
+            if (el.classList.contains('hidden')) {
+                el.classList.remove('hidden');
+                if (icon) icon.style.transform = 'rotate(180deg)';
+            } else {
+                el.classList.add('hidden');
+                if (icon) icon.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        // Fetch Background Jobs
+        async function fetchJobs() {
+            try {
+                const res = await fetch('/api/v1/dashboard/jobs');
+                const data = await res.json();
+                const tbody = document.getElementById('jobsTableBody');
+
+                if (!data.jobs || data.jobs.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="p-6 text-center text-zinc-500">هیچ جابی در صف موجود نیست.</td></tr>';
+                    return;
+                }
+
+                let html = '';
+                data.jobs.forEach(j => {
+                    let stClass = 'text-zinc-400';
+                    if (j.status === 'SUCCESS' || j.status === 'QC_PASSED') stClass = 'text-emerald-400 font-bold';
+                    if (j.status === 'FAILED') stClass = 'text-rose-400 font-bold';
+                    if (j.status === 'CLAIMED') stClass = 'text-amber-300 font-bold';
+
+                    html += `
+                        <tr class="hover:bg-zinc-900/40 transition">
+                            <td class="p-3 font-mono text-zinc-300">${j.id.slice(0, 16)}</td>
+                            <td class="p-3 font-semibold text-brand-300">${j.job_type}</td>
+                            <td class="p-3 text-zinc-400 font-mono">${(j.lesson_id || j.course_id || '-').slice(0, 18)}</td>
+                            <td class="p-3 ${stClass}">${j.status}</td>
+                            <td class="p-3">
+                                <div class="w-16 bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                                    <div class="bg-brand-500 h-1.5 rounded-full" style="width: ${j.progress || 0}%"></div>
+                                </div>
+                            </td>
+                            <td class="p-3 font-mono text-zinc-400">${j.attempt_count}/${j.max_attempts}</td>
+                            <td class="p-3 font-mono text-zinc-500 text-[10px]">${j.created_at ? j.created_at.slice(11, 19) : '-'}</td>
+                        </tr>
+                    `;
+                });
+                tbody.innerHTML = html;
+            } catch (err) {
+                console.error("Jobs fetch error:", err);
+            }
+        }
+
+        // Fetch Live Logs
+        async function fetchLogs() {
+            if (isLogPaused) return;
+
+            try {
+                const level = document.getElementById('logLevelSelect').value;
+                const search = document.getElementById('logSearchInput').value;
+                let url = `/api/v1/dashboard/logs?limit=150`;
+                if (level && level !== 'ALL') url += `&level=${level}`;
+                if (search) url += `&search=${encodeURIComponent(search)}`;
+
+                const res = await fetch(url);
+                const data = await res.json();
+                lastLogs = data.logs || [];
+
+                document.getElementById('logsCountBadge').innerText = `${lastLogs.length} رویداد`;
+                const term = document.getElementById('logsTerminal');
+
+                if (lastLogs.length === 0) {
+                    term.innerHTML = '<p class="text-zinc-600">// هنوز هیچ لاگی ثبت نشده است یا با فیلتر منطبق نیست.</p>';
+                    return;
+                }
+
+                let html = '';
+                lastLogs.forEach(l => {
+                    let lvlColor = 'text-blue-400';
+                    if (l.level === 'WARNING') lvlColor = 'text-amber-400 font-bold';
+                    if (l.level === 'ERROR' || l.level === 'CRITICAL') lvlColor = 'text-rose-400 font-bold';
+
+                    html += `
+                        <div class="hover:bg-zinc-900/60 p-0.5 rounded transition flex items-start gap-2">
+                            <span class="text-zinc-600 select-none">${l.timestamp}</span>
+                            <span class="${lvlColor} w-14 uppercase font-bold text-[10px] select-none">[${l.level}]</span>
+                            <span class="text-zinc-500 select-none">${l.logger}:</span>
+                            <span class="text-zinc-200 break-all">${escapeHtml(l.message)}</span>
+                        </div>
+                    `;
+                });
+
+                term.innerHTML = html;
+                // Auto-scroll to bottom
+                term.scrollTop = term.scrollHeight;
+            } catch (err) {
+                console.error("Logs fetch error:", err);
+            }
+        }
+
+        function toggleLogPause() {
+            isLogPaused = !isLogPaused;
+            const btn = document.getElementById('btnLogPause');
+            if (isLogPaused) {
+                btn.innerHTML = '<i class="fa-solid fa-play ml-1"></i> ادامه دریافت';
+                btn.classList.add('bg-amber-600/30', 'text-amber-300');
+            } else {
+                btn.innerHTML = '<i class="fa-solid fa-pause ml-1"></i> توقف دریافت';
+                btn.classList.remove('bg-amber-600/30', 'text-amber-300');
+                fetchLogs();
+            }
+        }
+
+        async function clearLogs() {
+            await fetch('/api/v1/dashboard/logs/clear', { method: 'POST' });
+            document.getElementById('logsTerminal').innerHTML = '<p class="text-zinc-600">// لاگ‌ها پاکسازی شدند.</p>';
+            document.getElementById('logsCountBadge').innerText = '0 رویداد';
+        }
+
+        function downloadLogs() {
+            const text = lastLogs.map(l => `[${l.timestamp}] [${l.level}] ${l.logger}: ${l.message}`).join('\n');
+            const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `rpim_pipeline_logs_${new Date().toISOString().slice(0, 10)}.txt`;
+            a.click();
+        }
+
+        // Voice Studio Test
+        async function testVoiceSynthesis() {
+            const input = document.getElementById('voiceTestInput');
+            const voice = document.getElementById('voiceSelect').value;
+            const style = document.getElementById('styleSelect').value;
+            const btn = document.getElementById('btnSynthTest');
+            const text = input.value.trim();
+
+            if (!text) {
+                alert('لطفاً متنی برای تست وارد کنید.');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> در حال تولید صدا با Google Gemini...';
+
+            try {
+                const res = await fetch('/api/v1/dashboard/test-voice', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text, voice, style })
+                });
+
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'خطا در تولید صدا');
+
+                document.getElementById('voiceResultBox').classList.remove('hidden');
+                document.getElementById('voiceResultCost').innerText = `هزینه: $${data.cost_usd.toFixed(5)}`;
+                document.getElementById('voiceResultRewritten').innerText = data.rewritten_text;
+                
+                const audio = document.getElementById('voiceResultAudio');
+                audio.src = data.audio_url;
+                audio.play();
+
+                fetchOverview();
+            } catch (err) {
+                alert('خطا در تولید صدا: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-waveform-lines"></i> <span>تولید صدای نمونه (Synthesize)</span>';
+            }
+        }
+
+        // Play Lesson Audio
+        function playLessonAudio(lessonId) {
+            const audio = new Audio(`/api/v1/dashboard/audio-preview/${lessonId}/persian_audio.wav`);
+            audio.play();
+        }
+
+        // Manual QC Override
+        async function overrideLessonQc(lessonId) {
+            if (!confirm(`آیا از تایید دستی کیفیت (Manual QC Override) برای درس ${lessonId} اطمینان دارید؟`)) return;
+            try {
+                const res = await fetch(`/api/v1/dashboard/lessons/${lessonId}/override-qc`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reason: 'Manual Admin Approval via Dashboard' })
+                });
+                const data = await res.json();
+                alert(`درس با موفقیت تایید شد و جاب آپلود تلگرام (${data.upload_job_id}) ایجاد گردید.`);
+                fetchOverview();
+                fetchCourses();
+            } catch (err) {
+                alert('خطا در تایید کیفیت: ' + err.message);
+            }
+        }
+
+        // Trigger Reclaim Leases
+        async function triggerReclaimLeases() {
+            try {
+                const res = await fetch('/api/v1/dashboard/recovery/reclaim-leases', { method: 'POST' });
+                const data = await res.json();
+                alert(`قفل‌های منقضی با موفقیت آزاد شدند. تعداد جاب‌های آزادشده: ${data.reclaimed_jobs}`);
+                fetchOverview();
+                fetchJobs();
+            } catch (err) {
+                alert('خطا: ' + err.message);
+            }
+        }
+
+        // Trigger Process One Job
+        async function triggerProcessOneJob() {
+            try {
+                const res = await fetch('/api/v1/dashboard/worker/process-one', { method: 'POST' });
+                const data = await res.json();
+                if (data.job_processed) {
+                    alert('یک جاب از صف با موفقیت توسط ورکر پردازش شد.');
+                } else {
+                    alert('صف خالی بود یا آستانه دیسک تکمیل است.');
+                }
+                fetchOverview();
+                fetchJobs();
+                fetchCourses();
+                fetchLogs();
+            } catch (err) {
+                alert('خطا: ' + err.message);
+            }
+        }
+
+        function escapeHtml(str) {
+            return (str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+
+        // Auto Refresh Loop (Every 5 seconds)
+        setInterval(() => {
+            const isAuto = document.getElementById('autoRefreshToggle').checked;
+            if (isAuto) {
+                fetchOverview();
+                fetchLogs();
+            }
+        }, 5000);
+
+        // Initial Load
+        fetchOverview();
+        fetchCourses();
+        fetchLogs();
+    </script>
+</body>
+</html>

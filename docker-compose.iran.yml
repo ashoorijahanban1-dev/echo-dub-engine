@@ -1,0 +1,38 @@
+# =============================================================================
+# RPIM TV Pipeline - Iran Relay Host (78.157.51.14)
+# Manages: Secure Iran Streaming Relay & Domestic Crawler Route
+# =============================================================================
+
+services:
+  iran-relay:
+    build:
+      context: .
+      dockerfile: Dockerfile.relay
+    container_name: rpim-iran-relay
+    restart: unless-stopped
+    ports:
+      - "${RELAY_PORT:-8090}:8080"
+    environment:
+      - RELAY_AUTH_SECRET=${RELAY_AUTH_SECRET}
+      - ENV=${ENV:-production}
+      - PORT=8080
+      - RELAY_SPOOL_DIR=/app/storage/relay_spool
+      - PROXY_URL=${PROXY_URL:-}
+    volumes:
+      - relay_spool_data:/app/storage/relay_spool
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - rpim-relay-net
+
+volumes:
+  relay_spool_data:
+    name: rpim_relay_spool_data
+
+networks:
+  rpim-relay-net:
+    name: rpim-relay-net
+    driver: bridge

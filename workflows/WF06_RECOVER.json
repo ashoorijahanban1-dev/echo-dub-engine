@@ -1,0 +1,124 @@
+{
+  "name": "WF06_RECOVER",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "1",
+      "name": "Cron (Every 15m)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [100, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.US_ENGINE_BASE_URL || 'http://engine-api:8000') + '/api/v1/recovery/reclaim-expired-leases' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-RPIM-Internal-Secret",
+              "value": "int_sec_af1716bf6979a5565127d7a856adffbfe4c62dd598d316fe"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2",
+      "name": "Reclaim Expired Worker Leases",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [360, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.US_ENGINE_BASE_URL || 'http://engine-api:8000') + '/api/v1/recovery/reconcile-outbox' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-RPIM-Internal-Secret",
+              "value": "int_sec_af1716bf6979a5565127d7a856adffbfe4c62dd598d316fe"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3",
+      "name": "Reconcile Stuck Outbox Events",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [620, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.US_ENGINE_BASE_URL || 'http://engine-api:8000') + '/api/v1/recovery/dead-letter-summary' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-RPIM-Internal-Secret",
+              "value": "int_sec_af1716bf6979a5565127d7a856adffbfe4c62dd598d316fe"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4",
+      "name": "Report Dead-Letter Failures to Admin",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 300]
+    }
+  ],
+  "connections": {
+    "Cron (Every 15m)": {
+      "main": [
+        [
+          {
+            "node": "Reclaim Expired Worker Leases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reclaim Expired Worker Leases": {
+      "main": [
+        [
+          {
+            "node": "Reconcile Stuck Outbox Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reconcile Stuck Outbox Events": {
+      "main": [
+        [
+          {
+            "node": "Report Dead-Letter Failures to Admin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

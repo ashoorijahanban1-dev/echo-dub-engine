@@ -1,0 +1,180 @@
+{
+  "name": "WF05_PUBLISH",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "course/publish",
+        "options": {}
+      },
+      "id": "1",
+      "name": "Course Ready Event Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [100, 300],
+      "webhookId": "course-publish-trigger"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.US_ENGINE_BASE_URL || 'http://engine-api:8000') + '/api/v1/publish/taxonomy-resolve' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-RPIM-Internal-Secret",
+              "value": "int_sec_af1716bf6979a5565127d7a856adffbfe4c62dd598d316fe"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"course_id\": \"{{ $json.body.course_id }}\",\n  \"is_locked\": false\n}",
+        "options": {}
+      },
+      "id": "2",
+      "name": "Smart Taxonomy & Tagging Resolution",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [360, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.US_ENGINE_BASE_URL || 'http://engine-api:8000') + '/api/v1/publish/stage-draft' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-RPIM-Internal-Secret",
+              "value": "int_sec_af1716bf6979a5565127d7a856adffbfe4c62dd598d316fe"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"course_id\": \"{{ $('Course Ready Event Trigger').first().json.body.course_id }}\",\n  \"release_hash\": \"{{ $('Course Ready Event Trigger').first().json.body.release_hash }}\"\n}",
+        "options": {}
+      },
+      "id": "3",
+      "name": "Stage Release as Draft on RPIM.ir",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [620, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.verification_status }}",
+              "rightValue": "VERIFIED",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "4",
+      "name": "Is Draft Verified?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [880, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.US_ENGINE_BASE_URL || 'http://engine-api:8000') + '/api/v1/publish/commit-visibility' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-RPIM-Internal-Secret",
+              "value": "int_sec_af1716bf6979a5565127d7a856adffbfe4c62dd598d316fe"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"remote_course_id\": \"{{ $json.remote_course_id }}\",\n  \"release_hash\": \"{{ $json.release_hash }}\",\n  \"make_public\": false\n}",
+        "options": {}
+      },
+      "id": "5",
+      "name": "Commit Visibility Switch (Safe Draft)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1140, 240]
+    }
+  ],
+  "connections": {
+    "Course Ready Event Trigger": {
+      "main": [
+        [
+          {
+            "node": "Smart Taxonomy & Tagging Resolution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Smart Taxonomy & Tagging Resolution": {
+      "main": [
+        [
+          {
+            "node": "Stage Release as Draft on RPIM.ir",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stage Release as Draft on RPIM.ir": {
+      "main": [
+        [
+          {
+            "node": "Is Draft Verified?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Draft Verified?": {
+      "main": [
+        [
+          {
+            "node": "Commit Visibility Switch (Safe Draft)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

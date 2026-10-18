@@ -1,0 +1,102 @@
+============================= test session starts =============================
+platform win32 -- Python 3.11.15, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\MahdiAhmadi\.antigravity-ide\n8n\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\MahdiAhmadi\.antigravity-ide\n8n
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.15.1, asyncio-1.4.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 80 items
+
+tests/test_api_server.py::TestAPIServer::test_auth_rejection PASSED      [  1%]
+tests/test_api_server.py::TestAPIServer::test_discovery_upsert_and_claim_api PASSED [  2%]
+tests/test_api_server.py::TestAPIServer::test_dubbing_async_endpoint_202 PASSED [  3%]
+tests/test_api_server.py::TestAPIServer::test_health_and_readiness PASSED [  5%]
+tests/test_conversational_rewriter.py::test_conversational_rewriter_transformations PASSED [  6%]
+tests/test_conversational_rewriter.py::test_linguistic_qc_stiff_formal_detection PASSED [  7%]
+tests/test_conversational_rewriter.py::test_linguistic_qc_excessive_slang_detection PASSED [  8%]
+tests/test_conversational_rewriter.py::test_linguistic_qc_sentence_length PASSED [ 10%]
+tests/test_conversational_rewriter.py::test_linguistic_qc_technical_preservation PASSED [ 11%]
+tests/test_conversational_rewriter.py::test_cache_key_isolation_by_style PASSED [ 12%]
+tests/test_conversational_rewriter.py::test_provenance_violation_on_formal_audio_reuse PASSED [ 13%]
+tests/test_conversational_rewriter.py::test_provenance_verification_passes_for_genuine_segment PASSED [ 15%]
+tests/test_conversational_rewriter.py::test_quota_429_enters_waiting_retry_without_fallback PASSED [ 16%]
+tests/test_conversational_rewriter.py::test_piper_adapter_initialization PASSED [ 17%]
+tests/test_conversational_rewriter.py::test_self_hosted_piper_synthesis_flow PASSED [ 18%]
+tests/test_conversational_rewriter.py::test_tehrani_genz_transformations PASSED [ 20%]
+tests/test_conversational_rewriter.py::test_edge_tts_adapter_initialization PASSED [ 21%]
+tests/test_conversational_rewriter.py::test_edge_tts_synthesis_flow PASSED [ 22%]
+tests/test_conversational_rewriter.py::test_mux_solo_audio_command PASSED [ 23%]
+tests/test_conversational_rewriter.py::test_audio_mastering_studio PASSED [ 25%]
+tests/test_fake_http_services.py::test_telegram_upload_success PASSED    [ 26%]
+tests/test_fake_http_services.py::test_telegram_upload_timeout_and_network_failure PASSED [ 27%]
+tests/test_fake_http_services.py::test_telegram_reconcile_after_failure PASSED [ 28%]
+tests/test_fake_http_services.py::test_rpim_publisher_staging_with_fake_api PASSED [ 30%]
+tests/test_fake_http_services.py::test_rpim_publisher_unreachable_media_rejection PASSED [ 31%]
+tests/test_fake_http_services.py::test_rpim_publisher_visibility_switch PASSED [ 32%]
+tests/test_fake_http_services.py::test_taxonomy_sync_from_fake_api PASSED [ 33%]
+tests/test_fake_http_services.py::test_relay_health PASSED               [ 35%]
+tests/test_fake_http_services.py::test_relay_unauthorized_access PASSED  [ 36%]
+tests/test_fake_http_services.py::test_relay_ssrf_protection_private_ips PASSED [ 37%]
+tests/test_fake_http_services.py::test_relay_ssrf_disallowed_domain PASSED [ 38%]
+tests/test_fake_http_services.py::test_relay_streaming_with_mock_origin PASSED [ 40%]
+tests/test_fake_http_services.py::test_telegram_fake_http_server_cache_miss_and_range_streaming PASSED [ 41%]
+tests/test_fake_http_services.py::test_clients_ignore_ambient_proxy_environment PASSED [ 42%]
+tests/test_fake_http_services.py::test_proxy_url_explicit_activation PASSED [ 43%]
+tests/test_full_suite.py::TestRPIMFullPipeline::test_01_duplicate_discovery_prevention PASSED [ 45%]
+tests/test_full_suite.py::TestRPIMFullPipeline::test_02_upsert_course_returns_existing_id PASSED [ 46%]
+tests/test_full_suite.py::TestRPIMFullPipeline::test_03_concurrent_claim_and_stale_callback_rejection PASSED [ 47%]
+tests/test_full_suite.py::TestRPIMFullPipeline::test_04_dual_db_crash_and_outbox_inbox_reconciliation PASSED [ 48%]
+tests/test_full_suite.py::TestRPIMFullPipeline::test_05_transfer_resume_and_identity_change PASSED [ 50%]
+tests/test_full_suite.py::TestRPIMFullPipeline::test_06_relay_token_never_sent_to_source PASSED [ 51%]
+tests/test_full_suite.py::TestRPIMFullPipeline::test_07_archive_parts_verification_and_zip_slip PASSED [ 52%]
+tests/test_full_suite.py::TestRPIMFullPipeline::test_08_retry_lesson_uses_cached_tts_and_glossary PASSED [ 53%]
+tests/test_full_suite.py::TestRPIMFullPipeline::test_09_check_course_completeness_blocks_unready_course PASSED [ 55%]
+tests/test_full_suite.py::TestRPIMFullPipeline::test_10_upload_intent_and_real_adapter PASSED [ 56%]
+tests/test_full_suite.py::TestRPIMFullPipeline::test_11_streaming_gateway_range_rfc7233 PASSED [ 57%]
+tests/test_full_suite.py::TestRPIMFullPipeline::test_12_publisher_staging_and_prior_version_safety PASSED [ 58%]
+tests/test_full_suite.py::TestRPIMFullPipeline::test_13_disk_space_guard_and_backpressure PASSED [ 60%]
+tests/test_full_suite.py::TestRPIMFullPipeline::test_14_taxonomy_synonym_and_persian_normalization PASSED [ 61%]
+tests/test_full_suite.py::TestRPIMFullPipeline::test_15_taxonomy_auto_create_category PASSED [ 62%]
+tests/test_full_suite.py::TestRPIMFullPipeline::test_16_taxonomy_needs_review_and_manual_lock PASSED [ 63%]
+tests/test_full_suite.py::TestRPIMFullPipeline::test_17_n8n_workflows_valid_json_and_env_bindings PASSED [ 65%]
+tests/test_n8n_workflows.py::test_workflow_json_validity[WF01_DISCOVER.json] PASSED [ 66%]
+tests/test_n8n_workflows.py::test_workflow_json_validity[WF02_DISPATCH.json] PASSED [ 67%]
+tests/test_n8n_workflows.py::test_workflow_json_validity[WF03_LESSON_PROCESS.json] PASSED [ 68%]
+tests/test_n8n_workflows.py::test_workflow_json_validity[WF04_FINALIZE.json] PASSED [ 70%]
+tests/test_n8n_workflows.py::test_workflow_json_validity[WF05_PUBLISH.json] PASSED [ 71%]
+tests/test_n8n_workflows.py::test_workflow_json_validity[WF06_RECOVER.json] PASSED [ 72%]
+tests/test_n8n_workflows.py::test_workflow_connections_integrity[WF01_DISCOVER.json] PASSED [ 73%]
+tests/test_n8n_workflows.py::test_workflow_connections_integrity[WF02_DISPATCH.json] PASSED [ 75%]
+tests/test_n8n_workflows.py::test_workflow_connections_integrity[WF03_LESSON_PROCESS.json] PASSED [ 76%]
+tests/test_n8n_workflows.py::test_workflow_connections_integrity[WF04_FINALIZE.json] PASSED [ 77%]
+tests/test_n8n_workflows.py::test_workflow_connections_integrity[WF05_PUBLISH.json] PASSED [ 78%]
+tests/test_n8n_workflows.py::test_workflow_connections_integrity[WF06_RECOVER.json] PASSED [ 80%]
+tests/test_n8n_workflows.py::test_wf03_adaptive_polling_loop PASSED      [ 81%]
+tests/test_n8n_workflows.py::test_wf03_execution_simulation_60_cycles_to_needs_review PASSED [ 82%]
+tests/test_pipeline_e2e.py::TestPipelineE2E::test_01_idempotent_discovery PASSED [ 83%]
+tests/test_pipeline_e2e.py::TestPipelineE2E::test_02_concurrency_and_fencing_token PASSED [ 85%]
+tests/test_pipeline_e2e.py::TestPipelineE2E::test_03_archive_sandbox_and_security PASSED [ 86%]
+tests/test_pipeline_e2e.py::TestPipelineE2E::test_04_transfer_anti_ssrf_and_ranges PASSED [ 87%]
+tests/test_pipeline_e2e.py::TestPipelineE2E::test_05_dubbing_qc_validation PASSED [ 88%]
+tests/test_pipeline_e2e.py::TestPipelineE2E::test_06_telegram_range_streaming PASSED [ 90%]
+tests/test_pipeline_e2e.py::TestPipelineE2E::test_07_publisher_staging PASSED [ 91%]
+tests/test_postgres_fastapi_endpoints.py::TestFastAPIPostgresIntegration::test_postgres_backend_dialect_and_fastapi_readiness PASSED [ 92%]
+tests/test_postgres_fastapi_endpoints.py::TestFastAPIPostgresIntegration::test_postgres_live_endpoints_if_available SKIPPED [ 93%]
+tests/test_postgres_integration.py::TestPostgresDialectIntegration::test_01_query_translation PASSED [ 95%]
+tests/test_postgres_integration.py::TestPostgresDialectIntegration::test_02_postgres_mock_transaction_and_query_execution PASSED [ 96%]
+tests/test_postgres_integration.py::TestPostgresDialectIntegration::test_03_migration_and_postgres_live_if_available SKIPPED [ 97%]
+tests/test_worker_pipeline.py::test_full_sequential_worker_pipeline PASSED [ 98%]
+tests/test_worker_pipeline.py::test_job_retry_and_dead_letter PASSED     [100%]
+
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  C:\Users\MahdiAhmadi\.antigravity-ide\n8n\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+.venv\Lib\site-packages\starlette\testclient.py:53
+  C:\Users\MahdiAhmadi\.antigravity-ide\n8n\.venv\Lib\site-packages\starlette\testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================= 78 passed, 2 skipped, 2 warnings in 19.69s ==================

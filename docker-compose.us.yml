@@ -1,0 +1,87 @@
+# =============================================================================
+# RPIM TV Pipeline - US Processing Host (209.145.63.253)
+# Manages: PostgreSQL (Internal), FastAPI Central Engine, Distributed Worker
+# =============================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: rpim-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-coolify}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_secure_db_password}
+    # Security: Bind to loopback only; do NOT expose public database ports
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init_postgres_dbs.sql:/docker-entrypoint-initdb.d/init_postgres_dbs.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-coolify}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - rpim-internal-net
+
+  engine-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rpim-engine-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - path: ${ENV_FILE:-.env}
+        required: false
+    environment:
+      - DISCOVERY_DB_URL=postgresql://${POSTGRES_USER:-coolify}:${POSTGRES_PASSWORD:-change_me_secure_db_password}@postgres:5432/rpim_discovery
+      - PROCESSING_DB_URL=postgresql://${POSTGRES_USER:-coolify}:${POSTGRES_PASSWORD:-change_me_secure_db_password}@postgres:5432/rpim_processing
+    ports:
+      - "127.0.0.1:${ENGINE_PORT:-8090}:8000"
+    volumes:
+      - storage_data:/app/storage
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/v1/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - rpim-internal-net
+
+  engine-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rpim-engine-worker
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      engine-api:
+        condition: service_healthy
+    env_file:
+      - path: ${ENV_FILE:-.env}
+        required: false
+    environment:
+      - DISCOVERY_DB_URL=postgresql://${POSTGRES_USER:-coolify}:${POSTGRES_PASSWORD:-change_me_secure_db_password}@postgres:5432/rpim_discovery
+      - PROCESSING_DB_URL=postgresql://${POSTGRES_USER:-coolify}:${POSTGRES_PASSWORD:-change_me_secure_db_password}@postgres:5432/rpim_processing
+    volumes:
+      - storage_data:/app/storage
+    command: ["python", "-c", "import time; from workers.job_runner import PipelineJobWorker; w = PipelineJobWorker(); print('RPIM Pipeline Worker started'); \nwhile True: w.process_one_job(); time.sleep(5)"]
+    networks:
+      - rpim-internal-net
+
+volumes:
+  postgres_data:
+    name: rpim_postgres_data
+  storage_data:
+    name: rpim_storage_data
+
+networks:
+  rpim-internal-net:
+    name: rpim-internal-net
+    driver: bridge

@@ -1,0 +1,406 @@
+{
+  "name": "WF03_LESSON_PROCESS",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lesson/process",
+        "options": {}
+      },
+      "id": "1",
+      "name": "Lesson Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [100, 300],
+      "webhookId": "lesson-process-trigger"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.US_ENGINE_BASE_URL || 'http://engine-api:8000') + '/api/v1/lessons/dub' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-RPIM-Internal-Secret",
+              "value": "int_sec_af1716bf6979a5565127d7a856adffbfe4c62dd598d316fe"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"lesson_id\": \"{{ $json.body.lesson_id }}\",\n  \"course_id\": \"{{ $json.body.course_id }}\",\n  \"voice\": \"{{ $json.body.voice || 'Puck' }}\"\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "2",
+      "name": "Enqueue Dubbing (Non-blocking 202 Accepted)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [340, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "number": [
+            {
+              "name": "poll_count",
+              "value": 0
+            },
+            {
+              "name": "max_polls",
+              "value": 60
+            }
+          ],
+          "string": [
+            {
+              "name": "job_id",
+              "value": "={{ $json.job_id }}"
+            },
+            {
+              "name": "lesson_id",
+              "value": "={{ $json.lesson_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3",
+      "name": "Init Polling Context",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [560, 300]
+    },
+    {
+      "parameters": {
+        "amount": 15,
+        "unit": "seconds"
+      },
+      "id": "4",
+      "name": "Wait Polling Interval",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [780, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ ($env.US_ENGINE_BASE_URL || 'http://engine-api:8000') + '/api/v1/jobs/' + $('Wait Polling Interval').item.json.job_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-RPIM-Internal-Secret",
+              "value": "int_sec_af1716bf6979a5565127d7a856adffbfe4c62dd598d316fe"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "5",
+      "name": "Poll Job Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1000, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c_completed",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "COMPLETED",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "6",
+      "name": "Is Job Completed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1220, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c_still_working",
+              "leftValue": "={{ ['QUEUED', 'PROCESSING', 'RETRY_WAIT'].includes($json.status) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "7",
+      "name": "Is Still In Progress?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1220, 480]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c_under_limit",
+              "leftValue": "={{ $('Wait Polling Interval').item.json.poll_count }}",
+              "rightValue": "={{ $('Wait Polling Interval').item.json.max_polls }}",
+              "operator": {
+                "type": "number",
+                "operation": "lessThan"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "8",
+      "name": "Check Max Poll Attempts",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1440, 480]
+    },
+    {
+      "parameters": {
+        "values": {
+          "number": [
+            {
+              "name": "poll_count",
+              "value": "={{ $('Wait Polling Interval').item.json.poll_count + 1 }}"
+            },
+            {
+              "name": "max_polls",
+              "value": "={{ $('Wait Polling Interval').item.json.max_polls }}"
+            }
+          ],
+          "string": [
+            {
+              "name": "job_id",
+              "value": "={{ $('Wait Polling Interval').item.json.job_id }}"
+            },
+            {
+              "name": "lesson_id",
+              "value": "={{ $('Wait Polling Interval').item.json.lesson_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9",
+      "name": "Increment Poll Counter",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [1660, 480]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.US_ENGINE_BASE_URL || 'http://engine-api:8000') + '/api/v1/lessons/mark-review' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-RPIM-Internal-Secret",
+              "value": "int_sec_af1716bf6979a5565127d7a856adffbfe4c62dd598d316fe"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"lesson_id\": \"{{ $('Wait Polling Interval').item.json.lesson_id }}\",\n  \"reasons\": [\"{{ $json.error_details || 'Job timeout or failure after maximum polling cycles' }}\"]\n}",
+        "options": {}
+      },
+      "id": "10",
+      "name": "Mark Lesson as Needs Review",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1440, 680]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "process_result",
+              "value": "SUCCESS_COMPLETED"
+            },
+            {
+              "name": "asset_id",
+              "value": "={{ $json.result_data ? (typeof $json.result_data === 'string' ? JSON.parse($json.result_data).asset_id : $json.result_data.asset_id) : '' }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "11",
+      "name": "Log Success Completion",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [1460, 300]
+    }
+  ],
+  "connections": {
+    "Lesson Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Enqueue Dubbing (Non-blocking 202 Accepted)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enqueue Dubbing (Non-blocking 202 Accepted)": {
+      "main": [
+        [
+          {
+            "node": "Init Polling Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Init Polling Context": {
+      "main": [
+        [
+          {
+            "node": "Wait Polling Interval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Polling Interval": {
+      "main": [
+        [
+          {
+            "node": "Poll Job Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Poll Job Status": {
+      "main": [
+        [
+          {
+            "node": "Is Job Completed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Job Completed?": {
+      "main": [
+        [
+          {
+            "node": "Log Success Completion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is Still In Progress?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Still In Progress?": {
+      "main": [
+        [
+          {
+            "node": "Check Max Poll Attempts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Lesson as Needs Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Max Poll Attempts": {
+      "main": [
+        [
+          {
+            "node": "Increment Poll Counter",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Lesson as Needs Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Increment Poll Counter": {
+      "main": [
+        [
+          {
+            "node": "Wait Polling Interval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

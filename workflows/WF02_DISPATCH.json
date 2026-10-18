@@ -1,0 +1,145 @@
+{
+  "name": "WF02_DISPATCH",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
+          ]
+        }
+      },
+      "id": "1",
+      "name": "Cron (Every 10m)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [100, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.US_ENGINE_BASE_URL || 'http://engine-api:8000') + '/api/v1/discovery/claim' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-RPIM-Internal-Secret",
+              "value": "int_sec_af1716bf6979a5565127d7a856adffbfe4c62dd598d316fe"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"worker_id\": \"n8n_dispatcher_us\",\n  \"lease_seconds\": 300\n}",
+        "options": {}
+      },
+      "id": "2",
+      "name": "Atomically Claim Discovered Course",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [320, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "3",
+      "name": "Is Course Claimed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [540, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.US_ENGINE_BASE_URL || 'http://engine-api:8000') + '/api/v1/processing/validate-and-enqueue' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-RPIM-Internal-Secret",
+              "value": "int_sec_af1716bf6979a5565127d7a856adffbfe4c62dd598d316fe"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"discovery_id\": \"{{ $json.id }}\",\n  \"url\": \"{{ $json.url }}\",\n  \"claim_token\": \"{{ $json.claim_token }}\"\n}",
+        "options": {}
+      },
+      "id": "4",
+      "name": "Validate Metadata & Enqueue Transfer/Extract",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [780, 240]
+    }
+  ],
+  "connections": {
+    "Cron (Every 10m)": {
+      "main": [
+        [
+          {
+            "node": "Atomically Claim Discovered Course",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Atomically Claim Discovered Course": {
+      "main": [
+        [
+          {
+            "node": "Is Course Claimed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Course Claimed?": {
+      "main": [
+        [
+          {
+            "node": "Validate Metadata & Enqueue Transfer/Extract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

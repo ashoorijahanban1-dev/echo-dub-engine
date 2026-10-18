@@ -1,0 +1,141 @@
+{
+  "name": "WF04_FINALIZE",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "course/finalize",
+        "options": {}
+      },
+      "id": "1",
+      "name": "Finalize Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [100, 300],
+      "webhookId": "course-finalize-trigger"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.US_ENGINE_BASE_URL || 'http://engine-api:8000') + '/api/v1/courses/check-completeness' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-RPIM-Internal-Secret",
+              "value": "int_sec_af1716bf6979a5565127d7a856adffbfe4c62dd598d316fe"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"course_id\": \"{{ $json.body.course_id }}\"\n}",
+        "options": {}
+      },
+      "id": "2",
+      "name": "Compute Completeness Against Manifest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [340, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.is_complete }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "3",
+      "name": "Is Course 100% Ready?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [580, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.US_ENGINE_BASE_URL || 'http://engine-api:8000') + '/api/v1/courses/emit-ready' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-RPIM-Internal-Secret",
+              "value": "int_sec_af1716bf6979a5565127d7a856adffbfe4c62dd598d316fe"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"course_id\": \"{{ $json.course_id }}\",\n  \"release_hash\": \"{{ $('Finalize Webhook Trigger').first().json.body.release_hash || 'rel_hash_auto' }}\"\n}",
+        "options": {}
+      },
+      "id": "4",
+      "name": "Emit Course Ready Release Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [820, 240]
+    }
+  ],
+  "connections": {
+    "Finalize Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Compute Completeness Against Manifest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Completeness Against Manifest": {
+      "main": [
+        [
+          {
+            "node": "Is Course 100% Ready?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Course 100% Ready?": {
+      "main": [
+        [
+          {
+            "node": "Emit Course Ready Release Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+env/
+
+# Environment secrets
+.env
+*.env.local
+
+# Storage & Temporary Media
+storage/*
+!storage/.gitkeep
+
+# Archives & Deployment Artifacts
+*.tar.gz
+*.zip
+
+# Pytest & IDE
+.pytest_cache/
+.coverage
+htmlcov/
+.idea/
+.vscode/

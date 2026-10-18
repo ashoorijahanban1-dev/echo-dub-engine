@@ -1,0 +1,146 @@
+{
+  "name": "WF01_DISCOVER",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 2
+            }
+          ]
+        }
+      },
+      "id": "1",
+      "name": "Schedule Trigger (2 Hours)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [100, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "discovery/scan",
+        "options": {}
+      },
+      "id": "2",
+      "name": "Manual Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [100, 500],
+      "webhookId": "manual-scan-trigger"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://downloadly.ir/download/elearning/video-tutorials/",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "3",
+      "name": "Fetch Downloadly via Iran Relay",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [340, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Deterministic Course Listing Parser (Strict Video Tutorials Only)\nconst html = $input.first().json.data || $input.first().json.body || '';\nconst linkRegex = /<a\\s+[^>]*href=[\"'](https?:\\/\\/(?:www\\.)?downloadly\\.ir\\/elearning\\/video-tutorials\\/([a-zA-Z0-9\\-_]+)\\/?)[^\"']*[\"'][^>]*>(.*?)<\\/a>/gi;\nlet match;\nconst courses = [];\nconst seen = new Set();\n\nwhile ((match = linkRegex.exec(html)) !== null) {\n  const rawUrl = match[1];\n  const slug = match[2];\n  const rawTitle = match[3].replace(/<[^>]+>/g, '').trim();\n  if (!slug || slug === 'video-tutorials' || slug === 'elearning') continue;\n  if (!rawTitle || rawTitle.length < 6 || rawTitle.includes('دیدگاه') || rawTitle.includes('صفحه') || seen.has(rawUrl)) continue;\n  seen.add(rawUrl);\n  \n  courses.push({\n    raw_url: rawUrl,\n    title: rawTitle,\n    source: 'downloadly.ir',\n    discovered_at: new Date().toISOString()\n  });\n}\n\nreturn courses.map(c => ({ json: c }));"
+      },
+      "id": "4",
+      "name": "Extract & Normalize Courses",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [580, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.US_ENGINE_BASE_URL || 'http://engine-api:8000') + '/api/v1/discovery/upsert' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-RPIM-Internal-Secret",
+              "value": "int_sec_af1716bf6979a5565127d7a856adffbfe4c62dd598d316fe"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"url\": \"{{ $json.raw_url }}\",\n  \"title\": \"{{ $json.title }}\"\n}",
+        "options": {}
+      },
+      "id": "5",
+      "name": "Idempotent Upsert to Discovery DB",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [820, 400]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger (2 Hours)": {
+      "main": [
+        [
+          {
+            "node": "Fetch Downloadly via Iran Relay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Downloadly via Iran Relay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Downloadly via Iran Relay": {
+      "main": [
+        [
+          {
+            "node": "Extract & Normalize Courses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract & Normalize Courses": {
+      "main": [
+        [
+          {
+            "node": "Idempotent Upsert to Discovery DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
