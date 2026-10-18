@@ -159,7 +159,17 @@ class PipelineJobWorker:
         dest_filename = params.get("filename", "archive.rar")
         dest_path = work_dir / dest_filename
 
-        if not source_url:
+        lesson_id = job.get("lesson_id")
+        if not source_url and lesson_id:
+            les = self.db.fetchone_processing("SELECT video_source_path FROM lessons WHERE id = ?", (lesson_id,))
+            if les and les.get("video_source_path"):
+                cand_v = les["video_source_path"]
+                if cand_v.startswith("http://") or cand_v.startswith("https://"):
+                    source_url = cand_v
+                    dest_filename = f"lesson_{lesson_id}.mp4"
+                    dest_path = work_dir / dest_filename
+
+        if not source_url and course_id:
             part = self.db.fetchone_processing(
                 "SELECT * FROM archive_parts WHERE course_id = ? AND status = 'PENDING' ORDER BY part_number ASC LIMIT 1",
                 (course_id,)
@@ -168,6 +178,35 @@ class PipelineJobWorker:
                 source_url = part["download_url"]
                 dest_filename = part["file_name"]
                 dest_path = work_dir / dest_filename
+
+        if not source_url and course_id:
+            crs = self.db.fetchone_processing("SELECT canonical_url FROM courses WHERE id = ?", (course_id,))
+            if crs and crs.get("canonical_url"):
+                cand_page = crs["canonical_url"]
+                try:
+                    import httpx
+                    from adapters.discovery import DownloadlyParser
+                    logger.info(f"Attempting automatic discovery of archive parts from course page {cand_page}...")
+                    resp = httpx.get(cand_page, timeout=12, follow_redirects=True)
+                    if resp.status_code == 200:
+                        details = DownloadlyParser.parse_course_details(resp.text, cand_page)
+                        parts = details.get("parts") or []
+                        if parts:
+                            for p_info in parts:
+                                self.db.insert_archive_part(
+                                    course_id=course_id,
+                                    part_number=p_info["part_number"],
+                                    file_name=p_info["file_name"],
+                                    download_url=p_info["download_url"],
+                                    expected_size=p_info.get("file_size", 0)
+                                )
+                            first_p = parts[0]
+                            source_url = first_p["download_url"]
+                            dest_filename = first_p["file_name"]
+                            dest_path = work_dir / dest_filename
+                            logger.info(f"Successfully discovered {len(parts)} archive parts for course {course_id}.")
+                except Exception as scrape_err:
+                    logger.warning(f"Failed to auto-discover archive links from {cand_page}: {scrape_err}")
 
         if not source_url:
             raise ValueError(f"No source download URL specified for TRANSFER job {job['id']}.")
