@@ -526,3 +526,31 @@ class PipelineJobWorker:
             "release_hash": release_hash,
             "course_id": course_id
         }, 0.0
+
+
+if __name__ == "__main__":
+    import signal
+    import sys
+
+    print("RPIM Pipeline Worker daemon starting...")
+    worker = PipelineJobWorker()
+    running = True
+
+    def _sig_handler(sig, frame):
+        global running
+        print("Worker shutting down gracefully...")
+        running = False
+
+    signal.signal(signal.SIGINT, _sig_handler)
+    signal.signal(signal.SIGTERM, _sig_handler)
+
+    print(f"Worker {worker.worker_id} online and polling for jobs...")
+    while running:
+        try:
+            job = worker.process_one_job()
+            if not job:
+                time.sleep(5)
+        except Exception as e:
+            print(f"Error in worker polling loop: {e}", file=sys.stderr)
+            time.sleep(5)
+

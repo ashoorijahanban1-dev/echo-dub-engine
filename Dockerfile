@@ -15,17 +15,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Copy dependency specifications
-COPY pyproject.toml README.md /app/
-
-# Install uv package manager and install dependencies
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/root/.local/bin:$PATH"
-
-RUN uv pip install --system -e ".[postgres]"
+# Install uv package manager
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
 # Copy application source code
 COPY . /app/
+
+# Install dependencies
+RUN uv pip install --system ".[postgres]"
 
 EXPOSE 8000
 

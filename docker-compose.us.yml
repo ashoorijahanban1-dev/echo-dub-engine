@@ -40,8 +40,11 @@ services:
     environment:
       - DISCOVERY_DB_URL=postgresql://${POSTGRES_USER:-coolify}:${POSTGRES_PASSWORD:-change_me_secure_db_password}@postgres:5432/rpim_discovery
       - PROCESSING_DB_URL=postgresql://${POSTGRES_USER:-coolify}:${POSTGRES_PASSWORD:-change_me_secure_db_password}@postgres:5432/rpim_processing
+      - GEMINI_KEY_POOL=${GEMINI_KEY_POOL:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
     ports:
-      - "127.0.0.1:${ENGINE_PORT:-8090}:8000"
+      - "${ENGINE_BIND:-0.0.0.0}:${ENGINE_PORT:-8090}:8000"
     volumes:
       - storage_data:/app/storage
     healthcheck:
@@ -69,9 +72,12 @@ services:
     environment:
       - DISCOVERY_DB_URL=postgresql://${POSTGRES_USER:-coolify}:${POSTGRES_PASSWORD:-change_me_secure_db_password}@postgres:5432/rpim_discovery
       - PROCESSING_DB_URL=postgresql://${POSTGRES_USER:-coolify}:${POSTGRES_PASSWORD:-change_me_secure_db_password}@postgres:5432/rpim_processing
+      - GEMINI_KEY_POOL=${GEMINI_KEY_POOL:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
     volumes:
       - storage_data:/app/storage
-    command: ["python", "-c", "import time; from workers.job_runner import PipelineJobWorker; w = PipelineJobWorker(); print('RPIM Pipeline Worker started'); \nwhile True: w.process_one_job(); time.sleep(5)"]
+    command: ["python", "-m", "workers.job_runner"]
     networks:
       - rpim-internal-net
 
