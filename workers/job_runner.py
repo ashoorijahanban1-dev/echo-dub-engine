@@ -155,6 +155,7 @@ class PipelineJobWorker:
         res_data_raw = job.get("result_data") or "{}"
         params = json.loads(res_data_raw) if isinstance(res_data_raw, str) else res_data_raw
 
+        part = None
         source_url = params.get("source_url")
         dest_filename = params.get("filename", "archive.rar")
         dest_path = work_dir / dest_filename
