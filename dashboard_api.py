@@ -313,7 +313,7 @@ def test_voice_synthesis(req: TestVoiceRequest):
     try:
         # Run through conversational rewriter
         rewritten = dubber.rewriter._rewrite_single_segment(text, source_en="", duration=5.0)
-        out_path, cost = dubber.synthesize_voice(text_fa=rewritten, output_wav=output_wav, voice_name=req.voice or "Puck", allow_fallback=True)
+        out_path, cost = dubber.synthesize_voice(text_fa=rewritten, output_wav=output_wav, voice_name=req.voice or "Puck", allow_fallback=False)
         
         logging.getLogger("rpim.dashboard").info(f"Admin voice test synthesized successfully: '{rewritten[:40]}...' (Cost: ${cost:.5f})")
         

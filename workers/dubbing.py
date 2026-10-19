@@ -614,23 +614,27 @@ class PersianDubbingWorker:
     def synthesize_voice(self, text_fa: str, output_wav: Path, voice_name: str = "Puck", allow_fallback: bool = False) -> Tuple[Path, float]:
         """
         Synthesizes Persian speech using Google Gemini TTS as MANDATORY provider.
-        Supports seamless studio fallback to Edge-TTS when allow_fallback is enabled.
+        Supports multi-model failover across official Gemini TTS models.
         Cache key uniquely embeds provider, model, voice, style, text, rate, channels.
         """
         output_wav = Path(output_wav).resolve()
         output_wav.parent.mkdir(parents=True, exist_ok=True)
 
-        # Edge-TTS / Microsoft Studio Voices (Farid / Dilara)
-        is_edge = (
-            self.tts_engine in ("edge_tts_farid", "edge_tts")
-            or voice_name in ("Farid", "Dilara")
-            or voice_name.startswith("fa-IR-")
-        )
-        if is_edge:
-            edge_v = "fa-IR-DilaraNeural" if voice_name in ("Dilara", "fa-IR-DilaraNeural") else "fa-IR-FaridNeural"
-            adapter = self.edge_adapter if self.edge_adapter.voice == edge_v else EdgeTTSAdapter(voice=edge_v)
+        # Standardize Gemini voices (Map any legacy names to official Google Gemini voices)
+        valid_voices = {"Puck", "Aoede", "Fenrir", "Charon", "Kore"}
+        if voice_name not in valid_voices:
+            if voice_name in ("Dilara", "fa-IR-DilaraNeural"):
+                voice_name = "Aoede"
+            elif voice_name in ("Farid", "fa-IR-FaridNeural"):
+                voice_name = "Puck"
+            else:
+                voice_name = "Puck"
+
+        # Explicit test override for edge_tts or piper only if configured in test suite
+        if self.tts_engine in ("edge_tts_farid", "edge_tts"):
+            adapter = self.edge_adapter
             cache_key = hashlib.sha256(
-                f"provider:edge_tts|model:{edge_v}|style:{self.style_version}|text:{text_fa}|rate:{adapter.rate}|pitch:{adapter.pitch}".encode()
+                f"provider:edge_tts|model:{adapter.voice}|style:{self.style_version}|text:{text_fa}|rate:{adapter.rate}|pitch:{adapter.pitch}".encode()
             ).hexdigest()
             cached_file = self.cache_dir / f"tts_{cache_key}.wav"
 
@@ -642,7 +646,6 @@ class PersianDubbingWorker:
             shutil.copy2(output_wav, cached_file)
             return output_wav, 0.0
 
-        # Self-Hosted Piper TTS (Zero Quota, 100% Free, Offline)
         if self.tts_engine == "self_hosted_piper":
             cache_key = hashlib.sha256(
                 f"provider:piper|model:{self.piper_adapter.model_path.name}|style:{self.style_version}|text:{text_fa}|rate:22050|channels:1".encode()
@@ -687,24 +690,13 @@ class PersianDubbingWorker:
         if not keys_to_try:
             raise SynthesisException("Google Gemini API key is missing. Cannot synthesize Persian dubbing.")
 
-        # Mandatory Google Gemini TTS
+        # Mandatory Google Gemini TTS (Clean payload without systemInstruction)
         import urllib.request
         import urllib.error
         import base64
 
-        system_instruction_text = (
-            "You are a master professional Persian voiceover narrator and experienced technical educator. "
-            "Read the provided Persian text aloud with a warm, calm, confident, articulate, and natural cadence. "
-            "Do not sound robotic, hurried, or monotone. Observe natural micro-pauses at commas and sentence endings. "
-            "Pronounce English technical terms and code keywords clearly and seamlessly within Persian speech. "
-            "Strictly speak the text as given without adding any extra greeting, commentary, or conversational reply."
-        )
-
         payload_dict = {
             "contents": [{"parts": [{"text": text_fa}]}],
-            "systemInstruction": {
-                "parts": [{"text": system_instruction_text}]
-            },
             "generationConfig": {
                 "responseModalities": ["AUDIO"],
                 "speechConfig": {
@@ -715,79 +707,46 @@ class PersianDubbingWorker:
             }
         }
         payload = json.dumps(payload_dict).encode('utf-8')
-        fallback_payload = json.dumps({
-            "contents": [{"parts": [{"text": text_fa}]}],
-            "generationConfig": {
-                "responseModalities": ["AUDIO"],
-                "speechConfig": {
-                    "voiceConfig": {
-                        "prebuiltVoiceConfig": {"voiceName": voice_name}
-                    }
-                }
-            }
-        }).encode('utf-8')
+
+        # Candidates for Google Gemini TTS model failover
+        candidate_models = [self.tts_model]
+        for m in ["gemini-2.5-flash-preview-tts", "gemini-3.1-flash-tts-preview", "gemini-2.5-pro-preview-tts"]:
+            if m not in candidate_models:
+                candidate_models.append(m)
 
         last_error = None
-        for attempt in range(len(keys_to_try)):
-            active_key = keys_to_try[(self._current_key_idx + attempt) % len(keys_to_try)]
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.tts_model}:generateContent?key={active_key}"
-            req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
-            try:
-                with urllib.request.urlopen(req, timeout=45) as resp:
-                    data = json.loads(resp.read().decode('utf-8'))
-                    parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
-                    pcm_bytes = None
-                    for p in parts:
-                        if "inlineData" in p:
-                            pcm_bytes = base64.b64decode(p["inlineData"]["data"])
-                            break
-                    if not pcm_bytes:
-                        raise SynthesisException(f"No audio inlineData returned by Gemini TTS: {data}")
-                    wav_data = self._pcm_to_wav(pcm_bytes, 24000, 1, 16)
-                    with open(output_wav, "wb") as f:
-                        f.write(wav_data)
-                    shutil.copy2(output_wav, cached_file)
-                    # Advance key index for round-robin load balancing
-                    self._current_key_idx = (self._current_key_idx + attempt + 1) % len(keys_to_try)
-                    return output_wav, estimated_cost
-            except urllib.error.HTTPError as he:
-                err_body = he.read().decode('utf-8', errors='ignore')
-                if he.code == 400 and b"systemInstruction" in payload:
-                    try:
-                        req_fb = urllib.request.Request(url, data=fallback_payload, headers={"Content-Type": "application/json"})
-                        with urllib.request.urlopen(req_fb, timeout=45) as resp_fb:
-                            data_fb = json.loads(resp_fb.read().decode('utf-8'))
-                            parts_fb = data_fb.get("candidates", [{}])[0].get("content", {}).get("parts", [])
-                            pcm_bytes_fb = None
-                            for p in parts_fb:
-                                if "inlineData" in p:
-                                    pcm_bytes_fb = base64.b64decode(p["inlineData"]["data"])
-                                    break
-                            if pcm_bytes_fb:
-                                wav_data = self._pcm_to_wav(pcm_bytes_fb, 24000, 1, 16)
-                                with open(output_wav, "wb") as f:
-                                    f.write(wav_data)
-                                shutil.copy2(output_wav, cached_file)
-                                self._current_key_idx = (self._current_key_idx + attempt + 1) % len(keys_to_try)
-                                return output_wav, estimated_cost
-                    except Exception:
-                        pass
-                last_error = f"HTTP {he.code}: {err_body[:250]}"
-                continue
-            except Exception as e:
-                last_error = str(e)
-                continue
+        for model in candidate_models:
+            for attempt in range(len(keys_to_try)):
+                active_key = keys_to_try[(self._current_key_idx + attempt) % len(keys_to_try)]
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={active_key}"
+                req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
+                try:
+                    with urllib.request.urlopen(req, timeout=45) as resp:
+                        data = json.loads(resp.read().decode('utf-8'))
+                        parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+                        pcm_bytes = None
+                        for p in parts:
+                            if "inlineData" in p:
+                                pcm_bytes = base64.b64decode(p["inlineData"]["data"])
+                                break
+                        if not pcm_bytes:
+                            raise SynthesisException(f"No audio inlineData returned by Gemini TTS: {data}")
+                        wav_data = self._pcm_to_wav(pcm_bytes, 24000, 1, 16)
+                        with open(output_wav, "wb") as f:
+                            f.write(wav_data)
+                        shutil.copy2(output_wav, cached_file)
+                        # Advance key index for round-robin load balancing
+                        self._current_key_idx = (self._current_key_idx + attempt + 1) % len(keys_to_try)
+                        return output_wav, estimated_cost
+                except urllib.error.HTTPError as he:
+                    err_body = he.read().decode('utf-8', errors='ignore')
+                    last_error = f"HTTP {he.code}: {err_body[:250]}"
+                    continue
+                except Exception as e:
+                    last_error = str(e)
+                    continue
 
-        if allow_fallback:
-            try:
-                edge_adapter = EdgeTTSAdapter()
-                edge_adapter.synthesize(text=text_fa, output_wav=output_wav)
-                shutil.copy2(output_wav, cached_file)
-                return output_wav, 0.0
-            except Exception:
-                pass
-
-        raise SynthesisException(f"All Google Gemini API keys in pool failed: {last_error}")
+        raise SynthesisException(f"All Google Gemini TTS models and API keys failed: {last_error}")
 
     @staticmethod
     def _clean_gemini_pcm(pcm_bytes: bytes, sample_rate: int = 24000) -> bytes:

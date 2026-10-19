@@ -90,7 +90,7 @@ GEMINI_KEY_POOL = [
         GEMINI_API_KEY
     ).split(",") if k.strip()
 ]
-GEMINI_TTS_MODEL = os.environ.get("GEMINI_TTS_MODEL", "gemini-3.8-flash-tts")
+GEMINI_TTS_MODEL = os.environ.get("GEMINI_TTS_MODEL", "gemini-2.5-flash-preview-tts")
 DEFAULT_VOICE_MALE = os.environ.get("DEFAULT_VOICE_MALE", "Puck")
 DEFAULT_VOICE_FEMALE = os.environ.get("DEFAULT_VOICE_FEMALE", "Aoede")
 # Note: Google Gemini TTS Puck is the gold standard voice.
