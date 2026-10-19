@@ -122,13 +122,16 @@
                 </div>
             </div>
 
-            <div class="glass-panel p-3 rounded-xl flex items-center gap-3">
-                <div class="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center text-sm">
+            <div onclick="openApiKeyModal()" class="glass-panel p-3 rounded-xl flex items-center gap-3 cursor-pointer hover:border-purple-500/60 transition group" title="کلیک برای تغییر یا افزودن کلید Gemini">
+                <div class="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center text-sm group-hover:bg-purple-500/20 transition">
                     <i class="fa-solid fa-key"></i>
                 </div>
-                <div class="overflow-hidden">
-                    <p class="text-[11px] text-zinc-400 truncate">کلیدهای Gemini</p>
-                    <p id="geminiKeysCount" class="text-xs font-semibold text-purple-300">۶ کلید فعال (Pool)</p>
+                <div class="overflow-hidden flex-1">
+                    <div class="flex items-center justify-between">
+                        <p class="text-[11px] text-zinc-400 truncate">کلیدهای Gemini</p>
+                        <span class="text-[9px] text-purple-400 border border-purple-500/30 rounded px-1 group-hover:bg-purple-500/10">تنظیم</span>
+                    </div>
+                    <p id="geminiKeysCount" class="text-xs font-semibold text-purple-300">۱ کلید فعال</p>
                 </div>
             </div>
 
@@ -289,10 +292,12 @@
 
                     <div class="flex flex-col gap-4 bg-dark-900/60 p-4 rounded-xl border border-zinc-800/80">
                         <div>
-                            <label class="text-xs text-zinc-300 font-medium mb-1 block">انتخاب صدا (Google Voice):</label>
+                            <label class="text-xs text-zinc-300 font-medium mb-1 block">انتخاب صدا و گوینده:</label>
                             <select id="voiceSelect" class="w-full bg-dark-950 border border-zinc-800 rounded-lg p-2 text-xs text-zinc-200">
-                                <option value="Puck" selected>Puck (صدای مردانه رادیویی و گرم - استاندارد طلایی)</option>
-                                <option value="Aoede">Aoede (صدای زنانه شیوا و آرام)</option>
+                                <option value="Farid" selected>فرید (استودیو مایکروسافت - رسا و طبیعی، بدون محدودیت کوئری)</option>
+                                <option value="Dilara">دل‌آرا (استودیو مایکروسافت - شیوا و شفاف، بدون محدودیت کوئری)</option>
+                                <option value="Puck">Google Gemini: Puck (مردانه رادیویی)</option>
+                                <option value="Aoede">Google Gemini: Aoede (زنانه آرام)</option>
                             </select>
                         </div>
 
@@ -901,6 +906,41 @@
             }
         }
 
+        // API Key Settings Modal
+        function openApiKeyModal() {
+            document.getElementById('apiKeyModal').classList.remove('hidden');
+        }
+        function closeApiKeyModal() {
+            document.getElementById('apiKeyModal').classList.add('hidden');
+        }
+        async function saveGeminiKey() {
+            const key = document.getElementById('inputGeminiKey').value.trim();
+            if (!key) {
+                alert('لطفاً کلید API را وارد کنید.');
+                return;
+            }
+            const btn = document.getElementById('btnSaveKey');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> در حال ذخیره...';
+            try {
+                const res = await fetch('/api/v1/dashboard/settings/api-key', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ gemini_api_key: key })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'خطا در ثبت کلید');
+                alert(`کلید جدید با موفقیت ذخیره و فعال شد!\nتعداد کلیدهای فعال: ${data.keys_count}`);
+                closeApiKeyModal();
+                fetchOverview();
+            } catch (e) {
+                alert('خطا: ' + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-check"></i> <span>ذخیره و فعال‌سازی آنی</span>';
+            }
+        }
+
         function escapeHtml(str) {
             return (str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
         }
@@ -955,9 +995,10 @@
                     <div>
                         <label class="text-xs text-zinc-400 mb-1 block">گوینده هوش مصنوعی:</label>
                         <select id="ingestVoice" class="w-full bg-zinc-900/90 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-brand-500 transition">
-                            <option value="Puck">مرد: Puck (آموزش‌محور، شفاف و رسا)</option>
-                            <option value="Aoede">زن: Aoede (صمیمی و آرام)</option>
-                            <option value="Fenrir">مرد: Fenrir (رسمی و مستند)</option>
+                            <option value="Farid" selected>مرد: فرید (استودیو مایکروسافت - رسا، بدون محدودیت کوئری)</option>
+                            <option value="Dilara">زن: دل‌آرا (استودیو مایکروسافت - شیوا، بدون محدودیت کوئری)</option>
+                            <option value="Puck">مرد: Puck (گوگل جمینای)</option>
+                            <option value="Aoede">زن: Aoede (گوگل جمینای)</option>
                         </select>
                     </div>
                     <div>
@@ -978,6 +1019,42 @@
                 <button id="btnSubmitIngest" onclick="submitNewCourse()" class="px-5 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-brand-600 to-emerald-600 hover:from-brand-500 hover:to-emerald-500 text-white transition flex items-center gap-1.5 shadow-lg shadow-brand-600/30">
                     <i class="fa-solid fa-play"></i>
                     <span>شروع فرآیند دوبله و ارسال خودکار</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    <!-- Modal: API Key Settings -->
+    <div id="apiKeyModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="glass-panel w-full max-w-md p-6 rounded-3xl border border-zinc-700/80 shadow-2xl relative flex flex-col gap-4">
+            <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center">
+                        <i class="fa-solid fa-key"></i>
+                    </div>
+                    <h3 class="text-sm font-bold text-white">تنظیمات کلید هوش مصنوعی گوگل (Gemini)</h3>
+                </div>
+                <button onclick="closeApiKeyModal()" class="text-zinc-500 hover:text-white transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div class="flex flex-col gap-3">
+                <p class="text-xs text-zinc-400 leading-relaxed">
+                    می‌توانید کلید اختصاصی خود را از <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-purple-400 underline font-medium">Google AI Studio</a> یا چند کلید جداشده با کاما وارد کنید تا استخر کلیدها فوراً به‌روزرسانی شود.
+                </p>
+                <div>
+                    <label class="text-xs text-zinc-300 mb-1 block font-medium">کلید API گوگل (Gemini API Key):</label>
+                    <input id="inputGeminiKey" type="password" placeholder="AIzaSy..." class="w-full bg-zinc-900/90 border border-zinc-700 rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-purple-500 transition dir-ltr" />
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 pt-2 border-t border-zinc-800">
+                <button onclick="closeApiKeyModal()" class="px-4 py-2 rounded-xl text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition">
+                    انصراف
+                </button>
+                <button id="btnSaveKey" onclick="saveGeminiKey()" class="px-5 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white transition flex items-center gap-1.5 shadow-lg shadow-purple-600/30">
+                    <i class="fa-solid fa-check"></i>
+                    <span>ذخیره و فعال‌سازی آنی</span>
                 </button>
             </div>
         </div>

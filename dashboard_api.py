@@ -100,6 +100,23 @@ class DiscoverUrlRequest(BaseModel):
 class ManualQCOverrideRequest(BaseModel):
     reason: Optional[str] = Field("Manual Admin Approval", description="Reason for QC approval")
 
+class UpdateApiKeyRequest(BaseModel):
+    gemini_api_key: str = Field(..., description="Google Gemini API key or comma-separated pool")
+
+
+@router.post("/api/v1/dashboard/settings/api-key")
+def update_gemini_api_key(req: UpdateApiKeyRequest):
+    new_key = req.gemini_api_key.strip()
+    if not new_key:
+        raise HTTPException(status_code=400, detail="API key cannot be empty.")
+    
+    config.GEMINI_API_KEY = new_key
+    config.GEMINI_KEY_POOL = [k.strip() for k in new_key.split(",") if k.strip()]
+    os.environ["GEMINI_API_KEY"] = new_key
+    os.environ["GEMINI_KEY_POOL"] = new_key
+    logging.getLogger("rpim.dashboard").info(f"Admin updated Gemini API key (Pool size: {len(config.GEMINI_KEY_POOL)})")
+    return {"status": "UPDATED", "keys_count": len(config.GEMINI_KEY_POOL)}
+
 
 @router.get("/api/v1/dashboard/overview")
 def get_dashboard_overview():
@@ -296,7 +313,7 @@ def test_voice_synthesis(req: TestVoiceRequest):
     try:
         # Run through conversational rewriter
         rewritten = dubber.rewriter._rewrite_single_segment(text, source_en="", duration=5.0)
-        out_path, cost = dubber.synthesize_voice(text_fa=rewritten, output_wav=output_wav, voice_name=req.voice or "Puck")
+        out_path, cost = dubber.synthesize_voice(text_fa=rewritten, output_wav=output_wav, voice_name=req.voice or "Puck", allow_fallback=True)
         
         logging.getLogger("rpim.dashboard").info(f"Admin voice test synthesized successfully: '{rewritten[:40]}...' (Cost: ${cost:.5f})")
         

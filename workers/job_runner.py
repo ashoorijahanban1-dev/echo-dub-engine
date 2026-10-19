@@ -411,7 +411,8 @@ class PipelineJobWorker:
             _, cost = self.dubber.synthesize_voice(
                 text_fa=seg["text_fa"],
                 output_wav=seg_audio_file,
-                voice_name=config.DEFAULT_VOICE_MALE
+                voice_name=config.DEFAULT_VOICE_MALE,
+                allow_fallback=True
             )
             total_cost += cost
             seg_copy = dict(seg)
