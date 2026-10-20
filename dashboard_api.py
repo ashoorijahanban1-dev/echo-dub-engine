@@ -16,7 +16,7 @@ from collections import deque
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, Response, status
+from fastapi import APIRouter, HTTPException, Query, Response, status, UploadFile, File
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
 from pydantic import BaseModel, Field
 
@@ -372,8 +372,27 @@ def stream_audio_preview(filename: str):
             while chunk := f.read(65536):
                 yield chunk
 
-    media_type = "audio/wav" if target_file.suffix == ".wav" else "video/mp4"
+    if target_file.suffix == ".mp3":
+        media_type = "audio/mpeg"
+    elif target_file.suffix == ".wav":
+        media_type = "audio/wav"
+    else:
+        media_type = "video/mp4"
+
     return StreamingResponse(iterfile(), media_type=media_type)
+
+
+@router.post("/api/v1/dashboard/upload-audio")
+async def upload_audio_file(file: UploadFile = File(...)):
+    """Uploads an audio file into the presentation/cache storage so it can be streamed or downloaded."""
+    target_dir = Path(config.STORAGE_DIR) / "presentations" / "issb"
+    target_dir.mkdir(parents=True, exist_ok=True)
+    out_file = target_dir / file.filename
+    content = await file.read()
+    with open(out_file, "wb") as f:
+        f.write(content)
+    logging.getLogger("rpim.dashboard").info(f"Audio file {file.filename} uploaded ({len(content)} bytes).")
+    return {"status": "UPLOADED", "filename": file.filename, "size": len(content), "audio_url": f"/api/v1/dashboard/audio-preview/{file.filename}"}
 
 
 @router.post("/api/v1/dashboard/worker/process-one")
